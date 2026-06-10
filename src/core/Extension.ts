@@ -1,28 +1,66 @@
-import type { Pipeable } from "effect/Pipeable"
+import { pipeArguments, type Pipeable } from "effect/Pipeable"
 
-import type { Priority } from "./Priority.js"
+import { Default, type Priority } from "./Priority.js"
+
+export interface Contribution<Type extends string = string, Payload = unknown> {
+  readonly type: Type
+  readonly payload: Payload
+  readonly priority: Priority
+}
 
 export interface Extension<Spec = unknown> extends Pipeable {
   readonly _tag: "Extension"
   readonly spec: Spec
+  readonly contributions: readonly Contribution[]
 }
+
+export namespace Extension {
+  export type Any = Extension<any>
+  export type SpecOf<T> = T extends Extension<infer Spec> ? Spec : never
+}
+
+export type UnionSpec<Extensions extends readonly Extension.Any[]> = {
+  readonly extensions: Extensions
+}
+
+class ExtensionImpl<Spec> implements Extension<Spec> {
+  readonly _tag = "Extension"
+
+  constructor(
+    readonly spec: Spec,
+    readonly contributions: readonly Contribution[],
+  ) {}
+
+  pipe() {
+    return pipeArguments(this, arguments)
+  }
+}
+
+const make = <Spec>(
+  spec: Spec,
+  contributions: readonly Contribution[] = [],
+): Extension<Spec> => new ExtensionImpl(spec, contributions)
+
+export const contribution = <const Type extends string, const Payload>(type: Type, payload: Payload): Extension<{
+  readonly contribution: Contribution<Type, Payload>
+}> =>
+  make(
+    { contribution: { type, payload, priority: Default } },
+    [{ type, payload, priority: Default }],
+  )
 
 export const union = <const Extensions extends readonly Extension[]>(
   ...extensions: Extensions
-): Extension<{ readonly extensions: Extensions }> => ({
-  _tag: "Extension",
-  spec: { extensions },
-  pipe() {
-    throw new Error("Extension.pipe is not implemented yet")
-  },
-})
+): Extension<UnionSpec<Extensions>> =>
+  make(
+    { extensions },
+    extensions.flatMap((extension) => [...extension.contributions]),
+  )
 
 export const priority =
   (priority: Priority) =>
-  <Spec>(extension: Extension<Spec>): Extension<{ readonly extension: Extension<Spec>; readonly priority: Priority }> => ({
-    _tag: "Extension",
-    spec: { extension, priority },
-    pipe() {
-      throw new Error("Extension.pipe is not implemented yet")
-    },
-  })
+  <Spec>(extension: Extension<Spec>): Extension<Spec> =>
+    make(
+      extension.spec,
+      extension.contributions.map((item) => ({ ...item, priority })),
+    )
