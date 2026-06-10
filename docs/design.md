@@ -100,7 +100,7 @@ Extension.NodeSpec({
   name: "paragraph",
   content: "inline*",
 }).pipe(
-  Extension.priority("high"),
+  Extension.priority(Priority.High),
 )
 ```
 
