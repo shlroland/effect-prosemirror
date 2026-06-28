@@ -13,3 +13,35 @@ expectTypeOf(combined.spec.extensions).toEqualTypeOf<readonly [typeof first, typ
 const highPriority = combined.pipe(Extension.priority(Priority.High))
 
 expectTypeOf(highPriority.spec).toEqualTypeOf<typeof combined.spec>()
+
+const paragraph = Extension.NodeSpec({
+  name: "paragraph",
+  content: "inline*",
+})
+
+expectTypeOf(paragraph.spec.nodeSpec.name).toEqualTypeOf<"paragraph">()
+
+const bold = Extension.MarkSpec({
+  name: "bold",
+  parseDOM: [{ tag: "strong" }],
+})
+
+expectTypeOf(bold.spec.markSpec.name).toEqualTypeOf<"bold">()
+
+const textAlign = Extension.NodeAttr({
+  type: "paragraph",
+  attr: "textAlign",
+  spec: { default: null },
+})
+
+expectTypeOf(textAlign.spec.nodeAttr.type).toEqualTypeOf<"paragraph">()
+expectTypeOf(textAlign.spec.nodeAttr.attr).toEqualTypeOf<"textAlign">()
+
+const href = Extension.MarkAttr({
+  type: "link",
+  attr: "href",
+  spec: { default: null },
+})
+
+expectTypeOf(href.spec.markAttr.type).toEqualTypeOf<"link">()
+expectTypeOf(href.spec.markAttr.attr).toEqualTypeOf<"href">()

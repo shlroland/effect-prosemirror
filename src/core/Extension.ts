@@ -1,4 +1,9 @@
 import { pipeArguments, type Pipeable } from "effect/Pipeable"
+import type {
+  AttributeSpec,
+  MarkSpec as ProseMirrorMarkSpec,
+  NodeSpec as ProseMirrorNodeSpec,
+} from "prosemirror-model"
 
 import { Default, type Priority } from "./Priority.js"
 
@@ -21,6 +26,26 @@ export namespace Extension {
 
 export type UnionSpec<Extensions extends readonly Extension.Any[]> = {
   readonly extensions: Extensions
+}
+
+export interface NamedNodeSpec<Name extends string = string> extends ProseMirrorNodeSpec {
+  readonly name: Name
+}
+
+export interface NamedMarkSpec<Name extends string = string> extends ProseMirrorMarkSpec {
+  readonly name: Name
+}
+
+export interface NodeAttrSpec<Type extends string = string, Attr extends string = string> {
+  readonly type: Type
+  readonly attr: Attr
+  readonly spec: AttributeSpec
+}
+
+export interface MarkAttrSpec<Type extends string = string, Attr extends string = string> {
+  readonly type: Type
+  readonly attr: Attr
+  readonly spec: AttributeSpec
 }
 
 class ExtensionImpl<Spec> implements Extension<Spec> {
@@ -55,6 +80,52 @@ export const union = <const Extensions extends readonly Extension[]>(
   make(
     { extensions },
     extensions.flatMap((extension) => [...extension.contributions]),
+  )
+
+export const NodeSpec = <const Spec extends NamedNodeSpec>(spec: Spec): Extension<{
+  readonly nodeSpec: Spec
+}> =>
+  make(
+    { nodeSpec: spec },
+    [{ type: "schema.nodeSpec", payload: spec, priority: Default }],
+  )
+
+export const MarkSpec = <const Spec extends NamedMarkSpec>(spec: Spec): Extension<{
+  readonly markSpec: Spec
+}> =>
+  make(
+    { markSpec: spec },
+    [{ type: "schema.markSpec", payload: spec, priority: Default }],
+  )
+
+export const NodeAttr = <
+  const Type extends string,
+  const Attr extends string,
+>(options: {
+  readonly type: Type
+  readonly attr: Attr
+  readonly spec: AttributeSpec
+}): Extension<{
+  readonly nodeAttr: NodeAttrSpec<Type, Attr>
+}> =>
+  make(
+    { nodeAttr: options },
+    [{ type: "schema.nodeAttr", payload: options, priority: Default }],
+  )
+
+export const MarkAttr = <
+  const Type extends string,
+  const Attr extends string,
+>(options: {
+  readonly type: Type
+  readonly attr: Attr
+  readonly spec: AttributeSpec
+}): Extension<{
+  readonly markAttr: MarkAttrSpec<Type, Attr>
+}> =>
+  make(
+    { markAttr: options },
+    [{ type: "schema.markAttr", payload: options, priority: Default }],
   )
 
 export const priority =
