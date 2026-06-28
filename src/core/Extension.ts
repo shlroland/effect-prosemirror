@@ -28,6 +28,10 @@ export type UnionSpec<Extensions extends readonly Extension.Any[]> = {
   readonly extensions: Extensions
 }
 
+export type UnionOperator<Extensions extends readonly Extension.Any[]> = Extension<UnionSpec<Extensions>> & {
+  <Self extends Extension.Any>(self: Self): Extension<UnionSpec<readonly [Self, ...Extensions]>>
+}
+
 export interface NamedNodeSpec<Name extends string = string> extends ProseMirrorNodeSpec {
   readonly name: Name
 }
@@ -74,13 +78,29 @@ export const contribution = <const Type extends string, const Payload>(type: Typ
     [{ type, payload, priority: Default }],
   )
 
-export const union = <const Extensions extends readonly Extension[]>(
+export const union = <const Extensions extends readonly Extension.Any[]>(
   ...extensions: Extensions
-): Extension<UnionSpec<Extensions>> =>
-  make(
-    { extensions },
-    extensions.flatMap((extension) => [...extension.contributions]),
-  )
+): UnionOperator<Extensions> => {
+  const operator = (<Self extends Extension.Any>(self: Self) =>
+    union(self, ...extensions)) as unknown as UnionOperator<Extensions>
+
+  Object.defineProperties(operator, {
+    _tag: { value: "Extension", enumerable: true },
+    spec: { value: { extensions }, enumerable: true },
+    contributions: {
+      value: extensions.flatMap((extension) => [...extension.contributions]),
+      enumerable: true,
+    },
+    pipe: {
+      value() {
+        return pipeArguments(this, arguments)
+      },
+      enumerable: true,
+    },
+  })
+
+  return operator
+}
 
 export const NodeSpec = <const Spec extends NamedNodeSpec>(spec: Spec): Extension<{
   readonly nodeSpec: Spec

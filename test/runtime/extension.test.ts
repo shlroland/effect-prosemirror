@@ -17,6 +17,20 @@ describe("Extension", () => {
     ])
   })
 
+  it("combines contributions as a pipe operator", () => {
+    const first = Extension.contribution("test.first", { value: 1 })
+    const second = Extension.contribution("test.second", { value: 2 })
+    const third = Extension.contribution("test.third", { value: 3 })
+
+    const combined = first.pipe(Extension.union(second, third))
+
+    expect(combined.contributions.map((item) => item.type)).toEqual([
+      "test.first",
+      "test.second",
+      "test.third",
+    ])
+  })
+
   it("applies priority to the whole extension subtree", () => {
     const first = Extension.contribution("test.first", { value: 1 })
     const second = Extension.contribution("test.second", { value: 2 })
