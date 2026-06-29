@@ -56,8 +56,8 @@ Deliverables:
 - `Extension.MarkAttr` (complete)
 - raw type model for specs and attrs (complete)
 - `Schema.collect(extension)` for same-name node and mark spec merge (complete)
-- Forward Reference support
-- ProseKit-style schema merge behavior (partially complete for same-name `NodeSpec` and `MarkSpec`)
+- Forward Reference support (complete for attr contributions targeting specs declared later in the union)
+- ProseKit-style schema merge behavior (partially complete for same-name specs and attr contribution merge)
 - Typed Diagnostics for Final Validation failures
 
 Validation:
@@ -65,14 +65,15 @@ Validation:
 - type tests for node and mark inference
 - runtime tests for same-name spec merge (complete)
 - runtime tests for priority-based same-name spec merge (complete)
+- runtime tests for attr merge and missing-target diagnostics (complete)
 - type tests for missing attr targets at editor finalization
 - runtime tests for attr merge and parse/serialize wrapping
 
 Next slice:
 
-- Merge `NodeAttr` and `MarkAttr` contributions into target specs.
-- Preserve Forward References until Final Validation.
-- Add missing-target Final Validation errors before Editor integration.
+- Promote missing-target diagnostics into Final Validation errors before Editor integration.
+- Add attr parse/serialize wrapping for `toDOM` and `parseDOM`.
+- Add type-level diagnostics for missing attr targets at editor finalization.
 
 ## Phase 4: Commands and keymaps
 
