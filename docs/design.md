@@ -100,6 +100,11 @@ Extension.NodeSpec({
   name: "paragraph",
   content: "inline*",
 }).pipe(
+  Extension.union(Extension.NodeAttr({
+    type: "paragraph",
+    attr: "textAlign",
+    spec: { default: null },
+  })),
   Extension.priority(Priority.High),
 )
 ```
@@ -123,6 +128,22 @@ class ExtensionImpl<Spec> implements Extension<Spec> {
 `Extension.union` does not apply a single global duplicate-key rule. Each contribution type defines its own Contribution Merge semantics.
 
 `Extension.union` accepts varargs only. Array-based composition is deferred because widened arrays lose tuple information that is needed for precise type-safe merging.
+
+`Extension.union` is both a root composition function and a pipeable composition operator:
+
+```ts
+const root = Extension.union(
+  Doc.make(),
+  Text.make(),
+  Paragraph.make(),
+)
+
+const paragraph = Paragraph.make().pipe(
+  Extension.union(BaseParagraphCommands.make()),
+)
+```
+
+The pipeable form prepends the receiver to the union, so `a.pipe(Extension.union(b, c))` has the same contribution order and tuple shape as `Extension.union(a, b, c)`.
 
 Extensions support priority as a pipeable modifier:
 
@@ -196,6 +217,8 @@ Schema merge should follow ProseKit's behavior:
 - `NodeAttr` and `MarkAttr` augment an existing node or mark contribution during Final Validation
 - attribute contributions can wrap `toDOM` and `parseDOM` behavior so added attributes participate in serialization and parsing
 - missing node or mark targets are Final Validation errors, not errors at `NodeAttr` / `MarkAttr` creation time
+
+The current schema merge entry point is `Schema.collect(extension)`. It collects schema contributions from an Extension and returns merged node and mark spec records. At this stage it handles same-name `NodeSpec` and `MarkSpec` merging, including priority order, `attrs` merging, and `parseDOM` append behavior. Attribute contributions, parse/serialize wrapping, and Final Validation remain separate follow-up steps.
 
 ## Commands
 

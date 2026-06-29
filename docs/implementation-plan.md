@@ -2,6 +2,8 @@
 
 ## Phase 1: Project scaffold
 
+Status: complete.
+
 Create the package and test infrastructure.
 
 Deliverables:
@@ -20,6 +22,8 @@ Validation:
 
 ## Phase 2: Pipeable Extension core
 
+Status: complete.
+
 Implement the core Extension value without ProseMirror integration.
 
 Deliverables:
@@ -27,6 +31,7 @@ Deliverables:
 - `Extension` interface compatible with Effect `Pipeable`
 - `ExtensionImpl` using Effect's `pipeArguments`
 - `Extension.union(...extensions)`
+- pipeable `Extension.union(...extensions)` operator form
 - `Extension.priority(Priority.High)`
 - `Priority` const object
 - contribution storage with priority metadata
@@ -35,28 +40,39 @@ Validation:
 
 - runtime tests for union and priority propagation
 - type tests for tuple-preserving varargs union
+- runtime and type tests for pipeable union preserving contribution order and tuple shape
 
 ## Phase 3: Schema contributions
 
 Implement schema contribution APIs and merge behavior.
 
+Status: in progress.
+
 Deliverables:
 
-- `Extension.NodeSpec`
-- `Extension.NodeAttr`
-- `Extension.MarkSpec`
-- `Extension.MarkAttr`
-- raw type model for specs and attrs
+- `Extension.NodeSpec` (complete)
+- `Extension.NodeAttr` (complete)
+- `Extension.MarkSpec` (complete)
+- `Extension.MarkAttr` (complete)
+- raw type model for specs and attrs (complete)
+- `Schema.collect(extension)` for same-name node and mark spec merge (complete)
 - Forward Reference support
-- ProseKit-style schema merge behavior
+- ProseKit-style schema merge behavior (partially complete for same-name `NodeSpec` and `MarkSpec`)
 - Typed Diagnostics for Final Validation failures
 
 Validation:
 
 - type tests for node and mark inference
+- runtime tests for same-name spec merge (complete)
+- runtime tests for priority-based same-name spec merge (complete)
 - type tests for missing attr targets at editor finalization
-- runtime tests for same-name spec merge
 - runtime tests for attr merge and parse/serialize wrapping
+
+Next slice:
+
+- Merge `NodeAttr` and `MarkAttr` contributions into target specs.
+- Preserve Forward References until Final Validation.
+- Add missing-target Final Validation errors before Editor integration.
 
 ## Phase 4: Commands and keymaps
 
