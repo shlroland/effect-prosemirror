@@ -218,7 +218,9 @@ Schema merge should follow ProseKit's behavior:
 - attribute contributions can wrap `toDOM` and `parseDOM` behavior so added attributes participate in serialization and parsing
 - missing node or mark targets are Final Validation errors, not errors at `NodeAttr` / `MarkAttr` creation time
 
-The current schema merge entry point is `Schema.collect(extension)`. It collects schema contributions from an Extension and returns merged node and mark spec records. At this stage it handles same-name `NodeSpec` and `MarkSpec` merging, including priority order, `attrs` merging, and `parseDOM` append behavior. Attribute contributions, parse/serialize wrapping, and Final Validation remain separate follow-up steps.
+The current schema merge entry point is `EditorSchema.collect(extension)`. It collects schema contributions from an Extension and returns merged node and mark spec records. At this stage it handles same-name `NodeSpec` and `MarkSpec` merging, including priority order, `attrs` merging, and `parseDOM` append behavior.
+
+`EditorSchema.create(extension)` builds the real ProseMirror schema from collected contributions. Missing attr targets are reported as `MissingSchemaTargetsError`; invalid ProseMirror schema definitions are wrapped in `InvalidEditorSchemaError`. Attribute parse/serialize wrapping and type-level Final Validation diagnostics remain separate follow-up steps.
 
 ## Commands
 

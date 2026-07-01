@@ -1,8 +1,10 @@
+import { Data } from "effect"
 import type {
   AttributeSpec,
   MarkSpec as ProseMirrorMarkSpec,
   NodeSpec as ProseMirrorNodeSpec,
 } from "prosemirror-model"
+import { Schema as ProseMirrorSchema } from "prosemirror-model"
 
 import type {
   Contribution,
@@ -14,10 +16,10 @@ import type {
 } from "./Extension.js"
 import { Priority, type Priority as PriorityValue } from "./Priority.js"
 
-export interface SchemaContributions {
+export interface EditorSchemaContributions {
   readonly nodes: Readonly<Record<string, NamedNodeSpec>>
   readonly marks: Readonly<Record<string, NamedMarkSpec>>
-  readonly diagnostics: readonly SchemaDiagnostic[]
+  readonly diagnostics: readonly EditorSchemaDiagnostic[]
 }
 
 export interface MissingNodeTargetDiagnostic {
@@ -32,7 +34,17 @@ export interface MissingMarkTargetDiagnostic {
   readonly attr: string
 }
 
-export type SchemaDiagnostic = MissingNodeTargetDiagnostic | MissingMarkTargetDiagnostic
+export type EditorSchemaDiagnostic = MissingNodeTargetDiagnostic | MissingMarkTargetDiagnostic
+
+export class MissingSchemaTargetsError extends Data.TaggedError("MissingSchemaTargetsError")<{
+  readonly diagnostics: readonly EditorSchemaDiagnostic[]
+}> {}
+
+export class InvalidEditorSchemaError extends Data.TaggedError("InvalidEditorSchemaError")<{
+  readonly cause: unknown
+}> {}
+
+export type EditorSchemaError = MissingSchemaTargetsError | InvalidEditorSchemaError
 
 interface IndexedContribution<Spec> {
   readonly spec: Spec
@@ -128,7 +140,7 @@ const mergeAttr = (attrs: Record<string, AttributeSpec> | undefined, attr: strin
 const applyNodeAttrs = (
   nodes: Readonly<Record<string, NamedNodeSpec>>,
   attrs: readonly NodeAttrSpec[],
-  diagnostics: SchemaDiagnostic[],
+  diagnostics: EditorSchemaDiagnostic[],
 ): Readonly<Record<string, NamedNodeSpec>> => {
   const result: Record<string, NamedNodeSpec> = { ...nodes }
 
@@ -152,7 +164,7 @@ const applyNodeAttrs = (
 const applyMarkAttrs = (
   marks: Readonly<Record<string, NamedMarkSpec>>,
   attrs: readonly MarkAttrSpec[],
-  diagnostics: SchemaDiagnostic[],
+  diagnostics: EditorSchemaDiagnostic[],
 ): Readonly<Record<string, NamedMarkSpec>> => {
   const result: Record<string, NamedMarkSpec> = { ...marks }
 
@@ -173,7 +185,7 @@ const applyMarkAttrs = (
   return result
 }
 
-export const collect = (extension: Extension.Any): SchemaContributions => {
+export const collect = (extension: Extension.Any): EditorSchemaContributions => {
   const nodes: Array<IndexedContribution<NamedNodeSpec>> = []
   const marks: Array<IndexedContribution<NamedMarkSpec>> = []
   const nodeAttrs: NodeAttrSpec[] = []
@@ -200,7 +212,7 @@ export const collect = (extension: Extension.Any): SchemaContributions => {
     }
   })
 
-  const diagnostics: SchemaDiagnostic[] = []
+  const diagnostics: EditorSchemaDiagnostic[] = []
   const mergedNodes = mergeNamedSpecs(nodes)
   const mergedMarks = mergeNamedSpecs(marks)
 
@@ -208,6 +220,25 @@ export const collect = (extension: Extension.Any): SchemaContributions => {
     nodes: applyNodeAttrs(mergedNodes, nodeAttrs, diagnostics),
     marks: applyMarkAttrs(mergedMarks, markAttrs, diagnostics),
     diagnostics,
+  }
+}
+
+export const create = (extension: Extension.Any): ProseMirrorSchema => {
+  const contributions = collect(extension)
+
+  if (contributions.diagnostics.length > 0) {
+    throw new MissingSchemaTargetsError({
+      diagnostics: contributions.diagnostics,
+    })
+  }
+
+  try {
+    return new ProseMirrorSchema({
+      nodes: contributions.nodes,
+      marks: contributions.marks,
+    })
+  } catch (cause) {
+    throw new InvalidEditorSchemaError({ cause })
   }
 }
 

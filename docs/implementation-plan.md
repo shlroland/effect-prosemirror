@@ -55,7 +55,8 @@ Deliverables:
 - `Extension.MarkSpec` (complete)
 - `Extension.MarkAttr` (complete)
 - raw type model for specs and attrs (complete)
-- `Schema.collect(extension)` for same-name node and mark spec merge (complete)
+- `EditorSchema.collect(extension)` for same-name node and mark spec merge (complete)
+- `EditorSchema.create(extension)` for creating a real ProseMirror schema (complete)
 - Forward Reference support (complete for attr contributions targeting specs declared later in the union)
 - ProseKit-style schema merge behavior (partially complete for same-name specs and attr contribution merge)
 - Typed Diagnostics for Final Validation failures
@@ -66,12 +67,12 @@ Validation:
 - runtime tests for same-name spec merge (complete)
 - runtime tests for priority-based same-name spec merge (complete)
 - runtime tests for attr merge and missing-target diagnostics (complete)
+- runtime tests for ProseMirror schema creation and schema creation errors (complete)
 - type tests for missing attr targets at editor finalization
 - runtime tests for attr merge and parse/serialize wrapping
 
 Next slice:
 
-- Promote missing-target diagnostics into Final Validation errors before Editor integration.
 - Add attr parse/serialize wrapping for `toDOM` and `parseDOM`.
 - Add type-level diagnostics for missing attr targets at editor finalization.
 

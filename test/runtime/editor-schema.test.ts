@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 
 import * as Extension from "../../src/core/Extension.js"
 import { Priority } from "../../src/core/Priority.js"
-import * as Schema from "../../src/core/Schema.js"
+import * as EditorSchema from "../../src/core/EditorSchema.js"
 
-describe("Schema", () => {
+describe("EditorSchema", () => {
   it("merges same-name node specs", () => {
     const extension = Extension.union(
       Extension.NodeSpec({
@@ -25,7 +25,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.nodes.paragraph).toMatchObject({
       name: "paragraph",
@@ -61,7 +61,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.marks.link).toMatchObject({
       name: "link",
@@ -89,7 +89,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.nodes.paragraph?.content).toBe("text*")
   })
@@ -106,7 +106,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.nodes.paragraph?.content).toBe("inline*")
   })
@@ -126,7 +126,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.nodes.paragraph?.attrs).toEqual({
       id: { default: null },
@@ -150,7 +150,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.marks.link?.attrs).toEqual({
       href: { default: null },
@@ -172,7 +172,7 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.nodes.paragraph?.attrs).toEqual({
       textAlign: { default: null },
@@ -194,11 +194,79 @@ describe("Schema", () => {
       }),
     )
 
-    const schema = Schema.collect(extension)
+    const schema = EditorSchema.collect(extension)
 
     expect(schema.diagnostics).toEqual([
       { _tag: "MissingNodeTarget", type: "missingNode", attr: "textAlign" },
       { _tag: "MissingMarkTarget", type: "missingMark", attr: "href" },
     ])
+  })
+
+  it("creates a ProseMirror schema from collected node and mark specs", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "doc",
+        content: "block+",
+      }),
+      Extension.NodeSpec({
+        name: "paragraph",
+        content: "inline*",
+        group: "block",
+      }),
+      Extension.NodeSpec({
+        name: "text",
+        group: "inline",
+      }),
+      Extension.MarkSpec({
+        name: "link",
+        attrs: {
+          href: { default: null },
+        },
+      }),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "textAlign",
+        spec: { default: "left" },
+      }),
+      Extension.MarkAttr({
+        type: "link",
+        attr: "title",
+        spec: { default: null },
+      }),
+    )
+
+    const schema = EditorSchema.create(extension)
+
+    expect(schema.nodes.doc?.name).toBe("doc")
+    expect(schema.nodes.paragraph?.spec.attrs?.textAlign?.default).toBe("left")
+    expect(schema.marks.link?.spec.attrs?.href?.default).toBeNull()
+    expect(schema.marks.link?.spec.attrs?.title?.default).toBeNull()
+  })
+
+  it("throws missing schema target errors when creating a ProseMirror schema", () => {
+    const extension = Extension.union(
+      Extension.NodeAttr({
+        type: "missingNode",
+        attr: "textAlign",
+        spec: { default: null },
+      }),
+    )
+
+    expect(() => EditorSchema.create(extension)).toThrow(EditorSchema.MissingSchemaTargetsError)
+  })
+
+  it("wraps invalid ProseMirror schema errors", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "doc",
+        content: "missingNode",
+      }),
+      Extension.NodeSpec({
+        name: "text",
+        group: "inline",
+      }),
+    )
+
+    expect(() => EditorSchema.create(extension)).toThrow(EditorSchema.InvalidEditorSchemaError)
   })
 })

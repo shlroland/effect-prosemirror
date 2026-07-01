@@ -40,9 +40,9 @@
       "types": "./dist/core/Priority.d.ts",
       "default": "./dist/core/Priority.js"
     },
-    "./core/Schema": {
-      "types": "./dist/core/Schema.d.ts",
-      "default": "./dist/core/Schema.js"
+    "./core/EditorSchema": {
+      "types": "./dist/core/EditorSchema.d.ts",
+      "default": "./dist/core/EditorSchema.js"
     }
   },
   "files": [

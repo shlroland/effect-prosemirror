@@ -1,7 +1,7 @@
 export * as Command from "./core/Command.js"
 export * as Editor from "./core/Editor.js"
+export * as EditorSchema from "./core/EditorSchema.js"
 export * as Extension from "./core/Extension.js"
 export * as Priority from "./core/Priority.js"
-export * as Schema from "./core/Schema.js"
 export * from "./core/Error.js"
 export { createEditor } from "./core/Editor.js"
