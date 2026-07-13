@@ -1,3 +1,4 @@
+import * as EffectSchema from "effect/Schema"
 import { pipeArguments, type Pipeable } from "effect/Pipeable"
 import type {
   AttributeSpec,
@@ -44,13 +45,42 @@ export interface NodeAttrSpec<Type extends string = string, Attr extends string 
   readonly type: Type
   readonly attr: Attr
   readonly spec: AttributeSpec
+  readonly parseDOM?: (element: HTMLElement) => unknown
+  readonly toDOM?: (value: unknown) => readonly [name: string, value: string] | null
 }
 
 export interface MarkAttrSpec<Type extends string = string, Attr extends string = string> {
   readonly type: Type
   readonly attr: Attr
   readonly spec: AttributeSpec
+  readonly parseDOM?: (element: HTMLElement) => unknown
+  readonly toDOM?: (value: unknown) => readonly [name: string, value: string] | null
 }
+
+export type AttrSchema = EffectSchema.Schema.AnyNoContext
+
+export type AttrDOMOptions = {
+  readonly parseDOM?: (element: HTMLElement) => unknown
+  readonly toDOM?: (value: unknown) => readonly [name: string, value: string] | null
+}
+
+export type AttrOptionsWithSpec<Type extends string, Attr extends string> = AttrDOMOptions & {
+  readonly type: Type
+  readonly attr: Attr
+  readonly spec: AttributeSpec
+}
+
+export type AttrOptionsWithValidation<Type extends string, Attr extends string> = AttrDOMOptions & {
+  readonly type: Type
+  readonly attr: Attr
+  readonly default?: unknown
+  readonly validate?: AttributeSpec["validate"]
+  readonly schema?: AttrSchema
+}
+
+export type AttrOptions<Type extends string = string, Attr extends string = string> =
+  | AttrOptionsWithSpec<Type, Attr>
+  | AttrOptionsWithValidation<Type, Attr>
 
 class ExtensionImpl<Spec> implements Extension<Spec> {
   readonly _tag = "Extension"
@@ -118,35 +148,71 @@ export const MarkSpec = <const Spec extends NamedMarkSpec>(spec: Spec): Extensio
     [{ type: "schema.markSpec", payload: spec, priority: Default }],
   )
 
+const defineAttrSpec = (options: AttrOptions): AttributeSpec => {
+  if ("spec" in options) {
+    return options.spec
+  }
+
+  const spec: AttributeSpec = {}
+
+  if ("default" in options) {
+    spec.default = options.default
+  }
+
+  if (options.validate && options.schema) {
+    throw new TypeError("Attribute options cannot define both validate and schema")
+  }
+
+  if (options.validate) {
+    spec.validate = options.validate
+  }
+
+  if (options.schema) {
+    spec.validate = EffectSchema.asserts(options.schema)
+  }
+
+  return spec
+}
+
 export const NodeAttr = <
   const Type extends string,
   const Attr extends string,
->(options: {
-  readonly type: Type
-  readonly attr: Attr
-  readonly spec: AttributeSpec
-}): Extension<{
+>(options: AttrOptions<Type, Attr>): Extension<{
   readonly nodeAttr: NodeAttrSpec<Type, Attr>
-}> =>
-  make(
-    { nodeAttr: options },
-    [{ type: "schema.nodeAttr", payload: options, priority: Default }],
+}> => {
+  const payload: NodeAttrSpec<Type, Attr> = {
+    type: options.type,
+    attr: options.attr,
+    spec: defineAttrSpec(options),
+    ...(options.parseDOM ? { parseDOM: options.parseDOM } : {}),
+    ...(options.toDOM ? { toDOM: options.toDOM } : {}),
+  }
+
+  return make(
+    { nodeAttr: payload },
+    [{ type: "schema.nodeAttr", payload, priority: Default }],
   )
+}
 
 export const MarkAttr = <
   const Type extends string,
   const Attr extends string,
->(options: {
-  readonly type: Type
-  readonly attr: Attr
-  readonly spec: AttributeSpec
-}): Extension<{
+>(options: AttrOptions<Type, Attr>): Extension<{
   readonly markAttr: MarkAttrSpec<Type, Attr>
-}> =>
-  make(
-    { markAttr: options },
-    [{ type: "schema.markAttr", payload: options, priority: Default }],
+}> => {
+  const payload: MarkAttrSpec<Type, Attr> = {
+    type: options.type,
+    attr: options.attr,
+    spec: defineAttrSpec(options),
+    ...(options.parseDOM ? { parseDOM: options.parseDOM } : {}),
+    ...(options.toDOM ? { toDOM: options.toDOM } : {}),
+  }
+
+  return make(
+    { markAttr: payload },
+    [{ type: "schema.markAttr", payload, priority: Default }],
   )
+}
 
 export const priority =
   (priority: Priority) =>

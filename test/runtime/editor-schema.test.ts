@@ -1,3 +1,5 @@
+import * as EffectSchema from "effect/Schema"
+import { Mark } from "prosemirror-model"
 import { describe, expect, it } from "vitest"
 
 import * as Extension from "../../src/core/Extension.js"
@@ -180,6 +182,175 @@ describe("EditorSchema", () => {
     expect(schema.diagnostics).toEqual([])
   })
 
+  it("wraps node parse and serialize behavior for added attrs", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "paragraph",
+        attrs: {
+          id: { default: null },
+        },
+        parseDOM: [
+          { tag: "p", attrs: { role: "paragraph" } },
+          { tag: "p.disabled", getAttrs: () => false },
+        ],
+        toDOM: () => ["p", { class: "copy" }, 0],
+      }),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "textAlign",
+        default: "left",
+        parseDOM: (element) => element.getAttribute("data-align"),
+        toDOM: (value) => value ? ["data-align", String(value)] : null,
+      }),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "trackingId",
+        default: null,
+        parseDOM: (element) => element.getAttribute("data-tracking-id"),
+        toDOM: (value) => value ? ["data-tracking-id", String(value)] : null,
+      }),
+    )
+    const schema = EditorSchema.collect(extension)
+    const spec = schema.nodes.paragraph
+    const element = {
+      getAttribute(name: string) {
+        return {
+          "data-align": "center",
+          "data-tracking-id": "track-1",
+        }[name] ?? null
+      },
+    } as HTMLElement
+
+    expect(spec?.parseDOM?.[0]?.getAttrs?.(element as never)).toEqual({
+      role: "paragraph",
+      textAlign: "center",
+      trackingId: "track-1",
+    })
+    expect(spec?.parseDOM?.[1]?.getAttrs?.(element)).toBe(false)
+    expect(spec?.toDOM?.({
+      attrs: {
+        id: null,
+        textAlign: "right",
+        trackingId: "track-2",
+      },
+    } as never)).toEqual([
+      "p",
+      {
+        class: "copy",
+        "data-align": "right",
+        "data-tracking-id": "track-2",
+      },
+      0,
+    ])
+  })
+
+  it("wraps mark tag parsing and serialization without changing style rules", () => {
+    const styleRule = { style: "text-decoration=line-through" } as const
+    const extension = Extension.union(
+      Extension.MarkSpec({
+        name: "link",
+        parseDOM: [
+          {
+            tag: "a",
+            getAttrs: (element) => ({ rel: element.getAttribute("rel") }),
+          },
+          styleRule,
+        ],
+        toDOM: () => ["a", 0],
+      }),
+      Extension.MarkAttr({
+        type: "link",
+        attr: "href",
+        default: null,
+        parseDOM: (element) => element.getAttribute("href"),
+        toDOM: (value) => value ? ["href", String(value)] : null,
+      }),
+    )
+    const schema = EditorSchema.collect(extension)
+    const spec = schema.marks.link
+    const element = {
+      getAttribute(name: string) {
+        return name === "href" ? "/docs" : "noopener"
+      },
+    } as HTMLElement
+
+    expect(spec?.parseDOM?.[0]?.getAttrs?.(element as never)).toEqual({
+      rel: "noopener",
+      href: "/docs",
+    })
+    expect(spec?.parseDOM?.[1]).toBe(styleRule)
+    expect(spec?.toDOM?.({ attrs: { href: "/guide" } } as never, true)).toEqual([
+      "a",
+      { href: "/guide" },
+      0,
+    ])
+  })
+
+  it("lets higher-priority attrs override lower-priority attr behavior", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "paragraph",
+        parseDOM: [{ tag: "p" }],
+        toDOM: () => ["p", 0],
+      }),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "level",
+        default: "high",
+        parseDOM: () => "high",
+        toDOM: () => ["data-high-level", "high"],
+      }).pipe(Extension.priority(Priority.High)),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "level",
+        default: "low",
+        parseDOM: () => "low",
+        toDOM: () => ["data-low-level", "low"],
+      }),
+    )
+    const schema = EditorSchema.collect(extension)
+    const spec = schema.nodes.paragraph
+
+    expect(spec?.attrs?.level?.default).toBe("high")
+    expect(spec?.parseDOM?.[0]?.getAttrs?.({} as HTMLElement)).toEqual({ level: "high" })
+    expect(spec?.toDOM?.({ attrs: { level: "ignored" } } as never)).toEqual([
+      "p",
+      { "data-high-level": "high" },
+      0,
+    ])
+  })
+
+  it("compares attr contribution priority with attrs declared on specs", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "paragraph",
+        attrs: {
+          level: { default: "node-spec" },
+        },
+      }).pipe(Extension.priority(Priority.High)),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "level",
+        default: "node-attr",
+      }).pipe(Extension.priority(Priority.Low)),
+      Extension.MarkSpec({
+        name: "link",
+        attrs: {
+          href: { default: "mark-spec" },
+        },
+      }).pipe(Extension.priority(Priority.Low)),
+      Extension.MarkAttr({
+        type: "link",
+        attr: "href",
+        default: "mark-attr",
+      }).pipe(Extension.priority(Priority.High)),
+    )
+    const schema = EditorSchema.collect(extension)
+
+    expect(schema.nodes.paragraph?.attrs?.level?.default).toBe("node-spec")
+    expect(schema.marks.link?.attrs?.href?.default).toBe("mark-attr")
+  })
+
   it("reports missing attr targets as diagnostics", () => {
     const extension = Extension.union(
       Extension.NodeAttr({
@@ -268,5 +439,99 @@ describe("EditorSchema", () => {
     )
 
     expect(() => EditorSchema.create(extension)).toThrow(EditorSchema.InvalidEditorSchemaError)
+  })
+
+  it("uses Effect Schema to validate node attrs through ProseMirror", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "doc",
+        content: "block+",
+      }),
+      Extension.NodeSpec({
+        name: "paragraph",
+        content: "inline*",
+        group: "block",
+      }),
+      Extension.NodeSpec({
+        name: "text",
+        group: "inline",
+      }),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "textAlign",
+        default: "left",
+        schema: EffectSchema.Literal("left", "center", "right"),
+      }),
+    )
+    const schema = EditorSchema.create(extension)
+
+    expect(() => schema.node("paragraph", { textAlign: "center" }).check()).not.toThrow()
+    expect(() => schema.node("paragraph", { textAlign: "justify" }).check()).toThrow()
+  })
+
+  it("uses Effect Schema to validate mark attrs through ProseMirror", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "doc",
+        content: "text*",
+      }),
+      Extension.NodeSpec({
+        name: "text",
+        group: "inline",
+      }),
+      Extension.MarkSpec({
+        name: "link",
+      }),
+      Extension.MarkAttr({
+        type: "link",
+        attr: "href",
+        default: null,
+        schema: EffectSchema.NullOr(EffectSchema.String),
+      }),
+    )
+    const schema = EditorSchema.create(extension)
+
+    expect(() => Mark.fromJSON(schema, { type: "link", attrs: { href: "https://example.com" } })).not.toThrow()
+    expect(() => Mark.fromJSON(schema, { type: "link", attrs: { href: 123 } })).toThrow()
+  })
+
+  it("keeps native ProseMirror attr validate support", () => {
+    const extension = Extension.union(
+      Extension.NodeSpec({
+        name: "doc",
+        content: "block+",
+      }),
+      Extension.NodeSpec({
+        name: "paragraph",
+        content: "inline*",
+        group: "block",
+      }),
+      Extension.NodeSpec({
+        name: "text",
+        group: "inline",
+      }),
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "level",
+        default: 1,
+        validate: "number",
+      }),
+    )
+    const schema = EditorSchema.create(extension)
+
+    expect(() => schema.node("paragraph", { level: 2 }).check()).not.toThrow()
+    expect(() => schema.node("paragraph", { level: "2" }).check()).toThrow()
+  })
+
+  it("rejects attrs that define both schema and validate", () => {
+    expect(() =>
+      Extension.NodeAttr({
+        type: "paragraph",
+        attr: "textAlign",
+        default: "left",
+        validate: "string",
+        schema: EffectSchema.String,
+      }),
+    ).toThrow(TypeError)
   })
 })

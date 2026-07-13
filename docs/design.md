@@ -190,7 +190,8 @@ Extension.NodeSpec({
 Extension.NodeAttr({
   type: "paragraph",
   attr: "textAlign",
-  default: null,
+  default: "left",
+  schema: EffectSchema.Literal("left", "center", "right"),
 })
 
 Extension.MarkSpec({
@@ -202,11 +203,50 @@ Extension.MarkSpec({
 Extension.MarkAttr({
   type: "link",
   attr: "href",
-  default: null,
+  spec: { default: null, validate: "string|null" },
 })
 ```
 
 `NodeAttr` and `MarkAttr` may use Forward References. A partial extension can declare an attribute for a node or mark that is declared elsewhere in the final Extension Union.
+
+Attribute contributions support two shapes. The low-level shape accepts a ProseMirror `AttributeSpec` directly:
+
+```ts
+Extension.NodeAttr({
+  type: "paragraph",
+  attr: "textAlign",
+  spec: { default: null, validate: "string|null" },
+})
+```
+
+Both shapes can define DOM parsing and serialization for the added attribute. `parseDOM` reads the attribute value from a matched element. `toDOM` returns a DOM attribute name/value pair, or `null` to omit it:
+
+```ts
+Extension.NodeAttr({
+  type: "paragraph",
+  attr: "textAlign",
+  default: "left",
+  parseDOM: (element) => element.getAttribute("data-align"),
+  toDOM: (value) => value ? ["data-align", String(value)] : null,
+})
+```
+
+During schema collection, attribute parsing wraps existing tag parse rules and preserves their `attrs`, `getAttrs`, and `false` rejection behavior. Attribute serialization wraps the target spec's existing `toDOM` function and merges the returned pair into its top-level DOM attributes. Style parse rules are not passed to attribute `parseDOM` because their parser input is a CSS value rather than an `HTMLElement`.
+
+The high-level shape accepts `default`, ProseMirror-compatible `validate`, or an Effect Schema value. To avoid confusing it with `EditorSchema` or ProseMirror's `Schema`, import Effect's schema module as `EffectSchema`:
+
+```ts
+import * as EffectSchema from "effect/Schema"
+
+Extension.NodeAttr({
+  type: "paragraph",
+  attr: "textAlign",
+  default: "left",
+  schema: EffectSchema.Literal("left", "center", "right"),
+})
+```
+
+Effect Schema validation is compiled to ProseMirror's synchronous `AttributeSpec.validate` hook, so only schemas with no Effect context are supported at this layer.
 
 Schema merge should follow ProseKit's behavior:
 
@@ -220,7 +260,7 @@ Schema merge should follow ProseKit's behavior:
 
 The current schema merge entry point is `EditorSchema.collect(extension)`. It collects schema contributions from an Extension and returns merged node and mark spec records. At this stage it handles same-name `NodeSpec` and `MarkSpec` merging, including priority order, `attrs` merging, and `parseDOM` append behavior.
 
-`EditorSchema.create(extension)` builds the real ProseMirror schema from collected contributions. Missing attr targets are reported as `MissingSchemaTargetsError`; invalid ProseMirror schema definitions are wrapped in `InvalidEditorSchemaError`. Attribute parse/serialize wrapping and type-level Final Validation diagnostics remain separate follow-up steps.
+`EditorSchema.create(extension)` builds the real ProseMirror schema from collected contributions. Missing attr targets are reported as `MissingSchemaTargetsError`; invalid ProseMirror schema definitions are wrapped in `InvalidEditorSchemaError`. Attribute parse/serialize wrapping is applied during collection. Type-level Final Validation diagnostics remain a separate follow-up step.
 
 ## Commands
 

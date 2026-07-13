@@ -1,3 +1,4 @@
+import * as EffectSchema from "effect/Schema"
 import { expectTypeOf } from "expect-type"
 
 import * as Extension from "../../src/core/Extension.js"
@@ -51,3 +52,13 @@ const href = Extension.MarkAttr({
 
 expectTypeOf(href.spec.markAttr.type).toEqualTypeOf<"link">()
 expectTypeOf(href.spec.markAttr.attr).toEqualTypeOf<"href">()
+
+const checkedTextAlign = Extension.NodeAttr({
+  type: "paragraph",
+  attr: "textAlign",
+  default: "left",
+  schema: EffectSchema.Literal("left", "center", "right"),
+})
+
+expectTypeOf(checkedTextAlign.spec.nodeAttr.type).toEqualTypeOf<"paragraph">()
+expectTypeOf(checkedTextAlign.spec.nodeAttr.attr).toEqualTypeOf<"textAlign">()

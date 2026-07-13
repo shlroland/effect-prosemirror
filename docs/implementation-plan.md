@@ -57,8 +57,9 @@ Deliverables:
 - raw type model for specs and attrs (complete)
 - `EditorSchema.collect(extension)` for same-name node and mark spec merge (complete)
 - `EditorSchema.create(extension)` for creating a real ProseMirror schema (complete)
+- Effect Schema attr validation sugar compiled to ProseMirror `AttributeSpec.validate` (complete)
 - Forward Reference support (complete for attr contributions targeting specs declared later in the union)
-- ProseKit-style schema merge behavior (partially complete for same-name specs and attr contribution merge)
+- ProseKit-style schema merge behavior (complete for same-name specs, attr contribution merge, and attr parse/serialize wrapping)
 - Typed Diagnostics for Final Validation failures
 
 Validation:
@@ -68,12 +69,12 @@ Validation:
 - runtime tests for priority-based same-name spec merge (complete)
 - runtime tests for attr merge and missing-target diagnostics (complete)
 - runtime tests for ProseMirror schema creation and schema creation errors (complete)
+- runtime tests for Effect Schema and native ProseMirror attr validation (complete)
 - type tests for missing attr targets at editor finalization
-- runtime tests for attr merge and parse/serialize wrapping
+- runtime tests for attr merge and parse/serialize wrapping (complete)
 
 Next slice:
 
-- Add attr parse/serialize wrapping for `toDOM` and `parseDOM`.
 - Add type-level diagnostics for missing attr targets at editor finalization.
 
 ## Phase 4: Commands and keymaps
