@@ -485,7 +485,18 @@ Final Validation checks that:
 - the schema is complete enough to create a ProseMirror editor
 - required services are provided
 
-Type-level failures should be Typed Diagnostics, not opaque `never` failures.
+Type-level failures should be Typed Diagnostics, not opaque `never` failures. The first Final Validation slice covers node and mark attrs that target missing specs. `Editor.layer`, `Editor.make`, and `createEditor` require a valid extension at the type level. `FinalValidation` resolves to `unknown` for a valid extension and exposes a diagnostic result for an invalid one, for example:
+
+```ts
+type MissingNodeTarget = {
+  readonly extension: Diagnostic<
+    "MissingNodeTarget",
+    { readonly type: "paragraph"; readonly attr: "textAlign" }
+  >
+}
+```
+
+An extension with a valid Forward Reference passes Final Validation because validation examines the completed Extension Union rather than an individual contribution.
 
 Runtime validation should mirror the type-level checks.
 

@@ -60,7 +60,7 @@ Deliverables:
 - Effect Schema attr validation sugar compiled to ProseMirror `AttributeSpec.validate` (complete)
 - Forward Reference support (complete for attr contributions targeting specs declared later in the union)
 - ProseKit-style schema merge behavior (complete for same-name specs, attr contribution merge, and attr parse/serialize wrapping)
-- Typed Diagnostics for Final Validation failures
+- Typed Diagnostics for missing node and mark attr targets at Final Validation (complete)
 
 Validation:
 
@@ -70,12 +70,8 @@ Validation:
 - runtime tests for attr merge and missing-target diagnostics (complete)
 - runtime tests for ProseMirror schema creation and schema creation errors (complete)
 - runtime tests for Effect Schema and native ProseMirror attr validation (complete)
-- type tests for missing attr targets at editor finalization
+- type tests for missing attr targets at editor finalization (complete)
 - runtime tests for attr merge and parse/serialize wrapping (complete)
-
-Next slice:
-
-- Add type-level diagnostics for missing attr targets at editor finalization.
 
 ## Phase 4: Commands and keymaps
 
