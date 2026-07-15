@@ -278,9 +278,14 @@ Extension.Commands({
     run: (options: { color: string }) => (state, dispatch) => {
       return true
     },
+    isActive: (options) => (state) => {
+      return false
+    },
   }),
 })
 ```
+
+`Extension.Commands` stores a named map of `Command.define` values. `run` is a creator whose user-facing parameters produce a ProseMirror `Command`; optional `isActive` uses those same user-facing parameters and produces a synchronous `(state) => boolean` query.
 
 The composed editor exposes a typed Command Surface:
 

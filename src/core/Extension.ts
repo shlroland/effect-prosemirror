@@ -6,6 +6,7 @@ import type {
   NodeSpec as ProseMirrorNodeSpec,
 } from "prosemirror-model"
 
+import type { CommandDefinition } from "./Command.js"
 import { Default, type Priority } from "./Priority.js"
 
 export interface Contribution<Type extends string = string, Payload = unknown> {
@@ -81,6 +82,8 @@ export type AttrOptionsWithValidation<Type extends string, Attr extends string> 
 export type AttrOptions<Type extends string = string, Attr extends string = string> =
   | AttrOptionsWithSpec<Type, Attr>
   | AttrOptionsWithValidation<Type, Attr>
+
+export type CommandDefinitions = Readonly<Record<string, CommandDefinition<any, any>>>
 
 class ExtensionImpl<Spec> implements Extension<Spec> {
   readonly _tag = "Extension"
@@ -213,6 +216,16 @@ export const MarkAttr = <
     [{ type: "schema.markAttr", payload, priority: Default }],
   )
 }
+
+export const Commands = <const Definitions extends CommandDefinitions>(
+  commands: Definitions,
+): Extension<{
+  readonly commands: Definitions
+}> =>
+  make(
+    { commands },
+    [{ type: "command.commands", payload: commands, priority: Default }],
+  )
 
 export const priority =
   (priority: Priority) =>

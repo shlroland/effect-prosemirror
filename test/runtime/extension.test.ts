@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import * as Command from "../../src/core/Command.js"
 import * as Extension from "../../src/core/Extension.js"
 import { Priority } from "../../src/core/Priority.js"
 
@@ -78,6 +79,22 @@ describe("Extension", () => {
       Priority.Default,
       Priority.Default,
       Priority.Default,
+    ])
+  })
+
+  it("stores command definitions as a contribution", () => {
+    const toggleBold = Command.define({
+      run: () => () => true,
+    })
+    const extension = Extension.Commands({ toggleBold })
+
+    expect(extension.spec.commands).toEqual({ toggleBold })
+    expect(extension.contributions).toEqual([
+      {
+        type: "command.commands",
+        payload: { toggleBold },
+        priority: Priority.Default,
+      },
     ])
   })
 })

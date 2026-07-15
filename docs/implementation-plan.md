@@ -79,8 +79,8 @@ Implement typed synchronous command contributions.
 
 Deliverables:
 
-- `Command.define({ run, isActive? })`
-- `Extension.Commands`
+- `Command.define({ run, isActive? })` (complete)
+- `Extension.Commands` (complete)
 - typed Command Surface
 - same-name command chain merge
 - `canExec` derived from dry-run command execution
