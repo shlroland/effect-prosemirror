@@ -29,3 +29,17 @@ The current history uses Conventional Commit prefixes, for example `feat: add pi
 ## Architecture & Terminology
 
 Preserve the domain language in `CONTEXT.md`: Commands are synchronous ProseMirror operations, while Effectful Actions handle asynchronous or Effect-managed workflows and reenter the editor later. Update `CONTEXT.md` or add an ADR when introducing new architectural terms, merge rules, lifecycle boundaries, or public API decisions.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default canonical triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository using root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
