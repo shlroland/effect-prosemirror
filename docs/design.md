@@ -65,11 +65,7 @@ import * as Text from "effect-prosemirror/extensions/text"
 import * as Paragraph from "effect-prosemirror/extensions/paragraph"
 import * as Basic from "effect-prosemirror/extensions/basic"
 
-const extension = Extension.union(
-  Doc.make(),
-  Text.make(),
-  Paragraph.make(),
-)
+const extension = Extension.union(Doc.make(), Text.make(), Paragraph.make())
 
 const basic = Basic.make()
 ```
@@ -79,12 +75,7 @@ The first built-in extensions should be minimal and exist to validate the core m
 `Basic.make()` follows a minimal-usable principle:
 
 ```ts
-Basic.make() = Extension.union(
-  Doc.make(),
-  Text.make(),
-  Paragraph.make(),
-  BaseCommands.make(),
-)
+Basic.make() = Extension.union(Doc.make(), Text.make(), Paragraph.make(), BaseCommands.make())
 ```
 
 It should not include history, keymaps, marks, lists, tables, drop cursor, or gap cursor in the first phase.
@@ -100,11 +91,13 @@ Extension.NodeSpec({
   name: "paragraph",
   content: "inline*",
 }).pipe(
-  Extension.union(Extension.NodeAttr({
-    type: "paragraph",
-    attr: "textAlign",
-    spec: { default: null },
-  })),
+  Extension.union(
+    Extension.NodeAttr({
+      type: "paragraph",
+      attr: "textAlign",
+      spec: { default: null },
+    }),
+  ),
   Extension.priority(Priority.High),
 )
 ```
@@ -132,15 +125,9 @@ class ExtensionImpl<Spec> implements Extension<Spec> {
 `Extension.union` is both a root composition function and a pipeable composition operator:
 
 ```ts
-const root = Extension.union(
-  Doc.make(),
-  Text.make(),
-  Paragraph.make(),
-)
+const root = Extension.union(Doc.make(), Text.make(), Paragraph.make())
 
-const paragraph = Paragraph.make().pipe(
-  Extension.union(BaseParagraphCommands.make()),
-)
+const paragraph = Paragraph.make().pipe(Extension.union(BaseParagraphCommands.make()))
 ```
 
 The pipeable form prepends the receiver to the union, so `a.pipe(Extension.union(b, c))` has the same contribution order and tuple shape as `Extension.union(a, b, c)`.
@@ -151,9 +138,7 @@ Extensions support priority as a pipeable modifier:
 Extension.union(
   Extension.MarkSpec({ name: "bold" }),
   Extension.Commands({ toggleBold: Command.define({ run }) }),
-).pipe(
-  Extension.priority(Priority.High),
-)
+).pipe(Extension.priority(Priority.High))
 ```
 
 `Extension.priority(...)` applies to the entire extension subtree it receives. Applying it to a single contribution affects only that contribution; applying it to an `Extension.union(...)` affects all contributions inside that union.
@@ -169,7 +154,7 @@ export const Priority = {
   Lowest: "lowest",
 } as const
 
-export type Priority = typeof Priority[keyof typeof Priority]
+export type Priority = (typeof Priority)[keyof typeof Priority]
 ```
 
 The default priority is `Priority.Default`.
@@ -227,7 +212,7 @@ Extension.NodeAttr({
   attr: "textAlign",
   default: "left",
   parseDOM: (element) => element.getAttribute("data-align"),
-  toDOM: (value) => value ? ["data-align", String(value)] : null,
+  toDOM: (value) => (value ? ["data-align", String(value)] : null),
 })
 ```
 
@@ -369,13 +354,7 @@ Editor.layer({ extension, element })
 The application satisfies those requirements by providing Layers around the editor layer:
 
 ```ts
-Effect.provide(
-  program,
-  Layer.mergeAll(
-    AiClientLive,
-    Editor.layer({ extension, element }),
-  ),
-)
+Effect.provide(program, Layer.mergeAll(AiClientLive, Editor.layer({ extension, element })))
 ```
 
 `createEditor` performs Final Validation against the provided `layer`. Missing service implementations should produce Typed Diagnostics.
@@ -395,10 +374,7 @@ const program = Effect.gen(function* () {
   yield* editor.transact(({ tr }) => {
     return tr.insertText("hello")
   })
-}).pipe(
-  Effect.provide(Editor.layer({ extension, element })),
-  Effect.provide(appLayer),
-)
+}).pipe(Effect.provide(Editor.layer({ extension, element })), Effect.provide(appLayer))
 ```
 
 `Editor.make` may exist as a lower-level constructor used by `Editor.layer`, but `Editor.layer` is the API that lets other Effect programs depend on the current editor through the environment.
@@ -445,11 +421,7 @@ type TransactionContext = {
   tr: Transaction
 }
 
-type Transact = (
-  fn: (
-    ctx: TransactionContext,
-  ) => Transaction | null | undefined | false,
-) => boolean
+type Transact = (fn: (ctx: TransactionContext) => Transaction | null | undefined | false) => boolean
 ```
 
 `transact` callbacks must be synchronous. Asynchronous work should complete first and then reenter through `transact` or the future Reentry API so the transaction is built from the current state.

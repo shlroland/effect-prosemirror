@@ -38,10 +38,7 @@ describe("EditorSchema", () => {
         className: { default: null },
       },
     })
-    expect(schema.nodes.paragraph?.parseDOM).toEqual([
-      { tag: "p" },
-      { tag: "section p" },
-    ])
+    expect(schema.nodes.paragraph?.parseDOM).toEqual([{ tag: "p" }, { tag: "section p" }])
   })
 
   it("merges same-name mark specs", () => {
@@ -73,10 +70,7 @@ describe("EditorSchema", () => {
         title: { default: null },
       },
     })
-    expect(schema.marks.link?.parseDOM).toEqual([
-      { tag: "a[href]" },
-      { tag: "a[title]" },
-    ])
+    expect(schema.marks.link?.parseDOM).toEqual([{ tag: "a[href]" }, { tag: "a[title]" }])
   })
 
   it("lets later same-priority specs override ordinary fields", () => {
@@ -200,24 +194,26 @@ describe("EditorSchema", () => {
         attr: "textAlign",
         default: "left",
         parseDOM: (element) => element.getAttribute("data-align"),
-        toDOM: (value) => value ? ["data-align", String(value)] : null,
+        toDOM: (value) => (value ? ["data-align", String(value)] : null),
       }),
       Extension.NodeAttr({
         type: "paragraph",
         attr: "trackingId",
         default: null,
         parseDOM: (element) => element.getAttribute("data-tracking-id"),
-        toDOM: (value) => value ? ["data-tracking-id", String(value)] : null,
+        toDOM: (value) => (value ? ["data-tracking-id", String(value)] : null),
       }),
     )
     const schema = EditorSchema.collect(extension)
     const spec = schema.nodes.paragraph
     const element = {
       getAttribute(name: string) {
-        return {
-          "data-align": "center",
-          "data-tracking-id": "track-1",
-        }[name] ?? null
+        return (
+          {
+            "data-align": "center",
+            "data-tracking-id": "track-1",
+          }[name] ?? null
+        )
       },
     } as HTMLElement
 
@@ -227,13 +223,15 @@ describe("EditorSchema", () => {
       trackingId: "track-1",
     })
     expect(spec?.parseDOM?.[1]?.getAttrs?.(element)).toBe(false)
-    expect(spec?.toDOM?.({
-      attrs: {
-        id: null,
-        textAlign: "right",
-        trackingId: "track-2",
-      },
-    } as never)).toEqual([
+    expect(
+      spec?.toDOM?.({
+        attrs: {
+          id: null,
+          textAlign: "right",
+          trackingId: "track-2",
+        },
+      } as never),
+    ).toEqual([
       "p",
       {
         class: "copy",
@@ -263,7 +261,7 @@ describe("EditorSchema", () => {
         attr: "href",
         default: null,
         parseDOM: (element) => element.getAttribute("href"),
-        toDOM: (value) => value ? ["href", String(value)] : null,
+        toDOM: (value) => (value ? ["href", String(value)] : null),
       }),
     )
     const schema = EditorSchema.collect(extension)
@@ -491,7 +489,9 @@ describe("EditorSchema", () => {
     )
     const schema = EditorSchema.create(extension)
 
-    expect(() => Mark.fromJSON(schema, { type: "link", attrs: { href: "https://example.com" } })).not.toThrow()
+    expect(() =>
+      Mark.fromJSON(schema, { type: "link", attrs: { href: "https://example.com" } }),
+    ).not.toThrow()
     expect(() => Mark.fromJSON(schema, { type: "link", attrs: { href: 123 } })).toThrow()
   })
 

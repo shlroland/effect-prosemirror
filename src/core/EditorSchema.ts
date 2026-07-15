@@ -133,10 +133,7 @@ const mergeSpec = <Spec extends NamedNodeSpec | NamedMarkSpec>(
   }
 
   if (left.parseDOM || right.parseDOM) {
-    merged.parseDOM = [
-      ...(left.parseDOM ?? []),
-      ...(right.parseDOM ?? []),
-    ]
+    merged.parseDOM = [...(left.parseDOM ?? []), ...(right.parseDOM ?? [])]
   }
 
   return merged
@@ -155,7 +152,11 @@ const mergeNamedSpecs = <Spec extends NamedNodeSpec | NamedMarkSpec>(
   return specs
 }
 
-const mergeAttr = (attrs: Record<string, AttributeSpec> | undefined, attr: string, spec: AttributeSpec) => ({
+const mergeAttr = (
+  attrs: Record<string, AttributeSpec> | undefined,
+  attr: string,
+  spec: AttributeSpec,
+) => ({
   ...attrs,
   [attr]: spec,
 })
@@ -187,7 +188,7 @@ const wrapParseDOM = <Rule extends ParseRule>(
         }
 
         return {
-          ...(attrs ?? {}),
+          ...attrs,
           [attr.attr]: attr.parseDOM?.(element),
         }
       },
@@ -207,10 +208,11 @@ const applyDOMAttr = (
 
   if (isDOMOutputArray(output)) {
     const [tag, second, ...rest] = output
-    const hasAttrs = second !== null
-      && typeof second === "object"
-      && !Array.isArray(second)
-      && !("nodeType" in second)
+    const hasAttrs =
+      second !== null &&
+      typeof second === "object" &&
+      !Array.isArray(second) &&
+      !("nodeType" in second)
 
     if (hasAttrs) {
       return [tag, { ...second, [name]: value }, ...rest]

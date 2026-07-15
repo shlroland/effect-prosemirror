@@ -30,7 +30,9 @@ export type UnionSpec<Extensions extends readonly Extension.Any[]> = {
   readonly extensions: Extensions
 }
 
-export type UnionOperator<Extensions extends readonly Extension.Any[]> = Extension<UnionSpec<Extensions>> & {
+export type UnionOperator<Extensions extends readonly Extension.Any[]> = Extension<
+  UnionSpec<Extensions>
+> & {
   <Self extends Extension.Any>(self: Self): Extension<UnionSpec<readonly [Self, ...Extensions]>>
 }
 
@@ -98,18 +100,18 @@ class ExtensionImpl<Spec> implements Extension<Spec> {
   }
 }
 
-const make = <Spec>(
-  spec: Spec,
-  contributions: readonly Contribution[] = [],
-): Extension<Spec> => new ExtensionImpl(spec, contributions)
+const make = <Spec>(spec: Spec, contributions: readonly Contribution[] = []): Extension<Spec> =>
+  new ExtensionImpl(spec, contributions)
 
-export const contribution = <const Type extends string, const Payload>(type: Type, payload: Payload): Extension<{
+export const contribution = <const Type extends string, const Payload>(
+  type: Type,
+  payload: Payload,
+): Extension<{
   readonly contribution: Contribution<Type, Payload>
 }> =>
-  make(
-    { contribution: { type, payload, priority: Default } },
-    [{ type, payload, priority: Default }],
-  )
+  make({ contribution: { type, payload, priority: Default } }, [
+    { type, payload, priority: Default },
+  ])
 
 export const union = <const Extensions extends readonly Extension.Any[]>(
   ...extensions: Extensions
@@ -135,21 +137,17 @@ export const union = <const Extensions extends readonly Extension.Any[]>(
   return operator
 }
 
-export const NodeSpec = <const Spec extends NamedNodeSpec>(spec: Spec): Extension<{
+export const NodeSpec = <const Spec extends NamedNodeSpec>(
+  spec: Spec,
+): Extension<{
   readonly nodeSpec: Spec
-}> =>
-  make(
-    { nodeSpec: spec },
-    [{ type: "schema.nodeSpec", payload: spec, priority: Default }],
-  )
+}> => make({ nodeSpec: spec }, [{ type: "schema.nodeSpec", payload: spec, priority: Default }])
 
-export const MarkSpec = <const Spec extends NamedMarkSpec>(spec: Spec): Extension<{
+export const MarkSpec = <const Spec extends NamedMarkSpec>(
+  spec: Spec,
+): Extension<{
   readonly markSpec: Spec
-}> =>
-  make(
-    { markSpec: spec },
-    [{ type: "schema.markSpec", payload: spec, priority: Default }],
-  )
+}> => make({ markSpec: spec }, [{ type: "schema.markSpec", payload: spec, priority: Default }])
 
 const defineAttrSpec = (options: AttrOptions): AttributeSpec => {
   if ("spec" in options) {
@@ -177,10 +175,9 @@ const defineAttrSpec = (options: AttrOptions): AttributeSpec => {
   return spec
 }
 
-export const NodeAttr = <
-  const Type extends string,
-  const Attr extends string,
->(options: AttrOptions<Type, Attr>): Extension<{
+export const NodeAttr = <const Type extends string, const Attr extends string>(
+  options: AttrOptions<Type, Attr>,
+): Extension<{
   readonly nodeAttr: NodeAttrSpec<Type, Attr>
 }> => {
   const payload: NodeAttrSpec<Type, Attr> = {
@@ -191,16 +188,12 @@ export const NodeAttr = <
     ...(options.toDOM ? { toDOM: options.toDOM } : {}),
   }
 
-  return make(
-    { nodeAttr: payload },
-    [{ type: "schema.nodeAttr", payload, priority: Default }],
-  )
+  return make({ nodeAttr: payload }, [{ type: "schema.nodeAttr", payload, priority: Default }])
 }
 
-export const MarkAttr = <
-  const Type extends string,
-  const Attr extends string,
->(options: AttrOptions<Type, Attr>): Extension<{
+export const MarkAttr = <const Type extends string, const Attr extends string>(
+  options: AttrOptions<Type, Attr>,
+): Extension<{
   readonly markAttr: MarkAttrSpec<Type, Attr>
 }> => {
   const payload: MarkAttrSpec<Type, Attr> = {
@@ -211,21 +204,14 @@ export const MarkAttr = <
     ...(options.toDOM ? { toDOM: options.toDOM } : {}),
   }
 
-  return make(
-    { markAttr: payload },
-    [{ type: "schema.markAttr", payload, priority: Default }],
-  )
+  return make({ markAttr: payload }, [{ type: "schema.markAttr", payload, priority: Default }])
 }
 
 export const Commands = <const Definitions extends CommandDefinitions>(
   commands: Definitions,
 ): Extension<{
   readonly commands: Definitions
-}> =>
-  make(
-    { commands },
-    [{ type: "command.commands", payload: commands, priority: Default }],
-  )
+}> => make({ commands }, [{ type: "command.commands", payload: commands, priority: Default }])
 
 export const priority =
   (priority: Priority) =>

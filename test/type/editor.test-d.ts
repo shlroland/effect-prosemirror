@@ -10,10 +10,13 @@ const missingNodeTarget = Extension.NodeAttr({
 })
 
 expectTypeOf<Editor.FinalValidation<typeof missingNodeTarget>>().toEqualTypeOf<{
-  readonly extension: Editor.Diagnostic<"MissingNodeTarget", {
-    readonly type: "missingParagraph"
-    readonly attr: "textAlign"
-  }>
+  readonly extension: Editor.Diagnostic<
+    "MissingNodeTarget",
+    {
+      readonly type: "missingParagraph"
+      readonly attr: "textAlign"
+    }
+  >
 }>()
 
 // @ts-expect-error Final Validation rejects node attrs without a target node spec.
@@ -32,10 +35,13 @@ const missingMarkTarget = Extension.MarkAttr({
 })
 
 expectTypeOf<Editor.FinalValidation<typeof missingMarkTarget>>().toEqualTypeOf<{
-  readonly extension: Editor.Diagnostic<"MissingMarkTarget", {
-    readonly type: "missingLink"
-    readonly attr: "href"
-  }>
+  readonly extension: Editor.Diagnostic<
+    "MissingMarkTarget",
+    {
+      readonly type: "missingLink"
+      readonly attr: "href"
+    }
+  >
 }>()
 
 // @ts-expect-error Final Validation rejects mark attrs without a target mark spec.
@@ -51,14 +57,20 @@ const missingTargets = Extension.union(missingNodeTarget, missingMarkTarget)
 
 expectTypeOf<Editor.FinalValidation<typeof missingTargets>>().toEqualTypeOf<{
   readonly extension:
-    | Editor.Diagnostic<"MissingNodeTarget", {
-        readonly type: "missingParagraph"
-        readonly attr: "textAlign"
-      }>
-    | Editor.Diagnostic<"MissingMarkTarget", {
-        readonly type: "missingLink"
-        readonly attr: "href"
-      }>
+    | Editor.Diagnostic<
+        "MissingNodeTarget",
+        {
+          readonly type: "missingParagraph"
+          readonly attr: "textAlign"
+        }
+      >
+    | Editor.Diagnostic<
+        "MissingMarkTarget",
+        {
+          readonly type: "missingLink"
+          readonly attr: "href"
+        }
+      >
 }>()
 
 const forwardReference = Extension.union(

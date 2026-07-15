@@ -1,3 +1,4 @@
 [tools]
 "npm:pnpm" = "11.9.0"
+"pipx:pre-commit" = "4.6.0"
 node = "26"

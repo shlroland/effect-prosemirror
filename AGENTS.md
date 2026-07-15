@@ -9,10 +9,15 @@ This is a private TypeScript package for an Effect-managed ProseMirror runtime. 
 Use mise for project-level Node and pnpm management. The package manager should match `packageManager: pnpm@11.9.0`.
 
 - `pnpm build`: emits JavaScript, declarations, declaration maps, and source maps using `tsconfig.build.json`.
+- `pnpm format`: formats supported repository files with Oxfmt.
+- `pnpm format:check`: verifies Oxfmt formatting without writing files.
+- `pnpm lint`: runs Oxlint over source and tests.
 - `pnpm test`: runs Vitest runtime tests and configured type tests.
 - `pnpm typecheck`: runs strict TypeScript checking without emitting files.
+- `pnpm check`: runs format, lint, and type checks.
+- `pnpm verify`: runs the complete CI gate: check, test, and build.
 
-Before handing off changes, run at least `pnpm typecheck` and `pnpm test`; run `pnpm build` when exports or emitted package shape changes.
+After cloning, run `mise install`, `pnpm install`, and `pnpm hooks:install` to install the project tools and local gates. Before handing off changes, run at least `pnpm check` and `pnpm test`; run `pnpm build` when exports or emitted package shape changes.
 
 ## Coding Style & Naming Conventions
 

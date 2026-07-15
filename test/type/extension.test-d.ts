@@ -13,9 +13,13 @@ expectTypeOf(combined.spec.extensions).toEqualTypeOf<readonly [typeof first, typ
 
 const third = Extension.contribution("test.third", { value: 3 })
 const piped = first.pipe(Extension.union(second, third))
-const expectedPiped: Extension.Extension<Extension.UnionSpec<readonly [typeof first, typeof second, typeof third]>> = piped
+const expectedPiped: Extension.Extension<
+  Extension.UnionSpec<readonly [typeof first, typeof second, typeof third]>
+> = piped
 
-expectTypeOf(expectedPiped.spec.extensions).toEqualTypeOf<readonly [typeof first, typeof second, typeof third]>()
+expectTypeOf(expectedPiped.spec.extensions).toEqualTypeOf<
+  readonly [typeof first, typeof second, typeof third]
+>()
 
 const highPriority = combined.pipe(Extension.priority(Priority.High))
 

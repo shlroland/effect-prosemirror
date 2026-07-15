@@ -2,11 +2,13 @@ import type { Command as ProseMirrorCommand, EditorState } from "prosemirror-sta
 
 const CommandDefinitionTypeId = Symbol("effect-prosemirror/CommandDefinition")
 
-export type CommandCreator<Args extends readonly any[] = readonly any[]> =
-  (...args: Args) => ProseMirrorCommand
+export type CommandCreator<Args extends readonly any[] = readonly any[]> = (
+  ...args: Args
+) => ProseMirrorCommand
 
-export type IsActive<Args extends readonly any[] = readonly any[]> =
-  (...args: Args) => (state: EditorState) => boolean
+export type IsActive<Args extends readonly any[] = readonly any[]> = (
+  ...args: Args
+) => (state: EditorState) => boolean
 
 export interface CommandDefinition<
   Run extends CommandCreator = CommandCreator,
@@ -21,8 +23,7 @@ export interface CommandDefinition<
 type IsActiveCreator = (...args: readonly any[]) => (state: EditorState) => boolean
 
 type IsEqual<Left, Right> =
-  (<Value>() => Value extends Left ? 1 : 2) extends
-  (<Value>() => Value extends Right ? 1 : 2)
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
     ? true
     : false
 
