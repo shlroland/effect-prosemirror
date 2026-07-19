@@ -7,6 +7,7 @@ import type {
 } from "prosemirror-model"
 
 import type { CommandDefinition } from "./Command.js"
+import type { KeyBinding } from "./Keymap.js"
 import { Default, type Priority } from "./Priority.js"
 
 export interface Contribution<Type extends string = string, Payload = unknown> {
@@ -85,7 +86,8 @@ export type AttrOptions<Type extends string = string, Attr extends string = stri
   | AttrOptionsWithSpec<Type, Attr>
   | AttrOptionsWithValidation<Type, Attr>
 
-export type CommandDefinitions = Readonly<Record<string, CommandDefinition<any, any>>>
+export type CommandDefinitions = readonly CommandDefinition[]
+export type KeyBindings = readonly KeyBinding[]
 
 class ExtensionImpl<Spec> implements Extension<Spec> {
   readonly _tag = "Extension"
@@ -208,10 +210,22 @@ export const MarkAttr = <const Type extends string, const Attr extends string>(
 }
 
 export const Commands = <const Definitions extends CommandDefinitions>(
-  commands: Definitions,
+  ...definitions: Definitions
 ): Extension<{
-  readonly commands: Definitions
-}> => make({ commands }, [{ type: "command.commands", payload: commands, priority: Default }])
+  readonly commandDefinitions: Definitions
+}> =>
+  make({ commandDefinitions: definitions }, [
+    { type: "command.definitions", payload: definitions, priority: Default },
+  ])
+
+export const Keymap = <const Bindings extends KeyBindings>(
+  ...bindings: Bindings
+): Extension<{
+  readonly keyBindings: Bindings
+}> =>
+  make({ keyBindings: bindings }, [
+    { type: "keymap.bindings", payload: bindings, priority: Default },
+  ])
 
 export const priority =
   (priority: Priority) =>

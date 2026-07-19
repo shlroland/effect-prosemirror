@@ -1,0 +1,15 @@
+# Static Keymaps Validate Before View Integration
+
+Static Keymaps are modeled and Final Validated with Commands, but do not install keyboard listeners in the Editing Core. Actual key event handling is deferred to the future `EditorView` adapter, keeping DOM focus and ProseMirror plugin lifecycle outside the synchronous command runtime.
+
+Public key bindings use structured Key Chords rather than raw ProseMirror key-name strings. Each binding contains a Command Invocation whose complete, immutable arguments are captured when the Static Keymap is constructed. A Command Invocation accepts a Command Tag, not a bare command-name string, so its argument tuple is checked immediately without depending on a concrete implementation. Final Validation separately ensures that the composed Extension Union provides an implementation for the referenced Tag. Runtime-computed command arguments are passed directly through the Command Surface instead of being deferred inside a Static Keymap.
+
+Keys use logical `KeyboardEvent.key` semantics, exposed as a closed tagged union with typed constructors for characters, digits, explicit standard named keys, and function keys. `Key.Character` synchronously constructs a character key and throws Effect `InvalidKeyError` for invalid dynamic values; `Key.decodeCharacter` exposes the same validation through an Effect error channel. The first version provides no raw or arbitrary-named-key escape hatch; missing standard keys are added explicitly. The public model also does not expose physical `KeyboardEvent.code` positions, preserving keyboard-layout-aware behavior and a direct mapping to ProseMirror's key-name semantics.
+
+Modifiers are an unordered, canonical set of `Mod`, `Ctrl`, `Alt`, `Shift`, and `Meta`. Key Chord construction normalizes modifier order and removes duplicates; public aliases such as `Cmd` and `Control` are excluded. Chord identity therefore does not depend on authoring order or duplicate modifier entries.
+
+The Static Keymap keeps `Mod` platform-abstract. The future View adapter preserves the ordered binding chains but delegates platform-specific `Mod` resolution, shifted-character behavior, key normalization, and event matching to `prosemirror-keymap`; it does not reimplement ProseMirror's keyboard logic. Platform-dependent chord overlap therefore follows normal ProseMirror plugin precedence and command `false` fallthrough.
+
+Bindings for the same Key Chord form a short-circuiting chain ordered by descending contribution priority and then Extension Union declaration order. A binding returning `false` passes handling to the next binding; the first `true` consumes the key. Duplicate chords are not rejected because this chaining permits conditional overrides and fallbacks across independently composed extensions.
+
+One Key Binding contains exactly one Command Invocation. Multiple-command fallback is represented by composing multiple bindings for the same chord through Keymap Merge, rather than by adding a second sequence model inside a binding.

@@ -83,16 +83,17 @@ describe("Extension", () => {
   })
 
   it("stores command definitions as a contribution", () => {
-    const toggleBold = Command.define({
+    class ToggleBold extends Command.Tag("toggleBold")<ToggleBold, []>() {}
+    const toggleBold = Command.define(ToggleBold, {
       run: () => () => true,
     })
-    const extension = Extension.Commands({ toggleBold })
+    const extension = Extension.Commands(toggleBold)
 
-    expect(extension.spec.commands).toEqual({ toggleBold })
+    expect(extension.spec.commandDefinitions).toEqual([toggleBold])
     expect(extension.contributions).toEqual([
       {
-        type: "command.commands",
-        payload: { toggleBold },
+        type: "command.definitions",
+        payload: [toggleBold],
         priority: Priority.Default,
       },
     ])

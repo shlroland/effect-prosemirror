@@ -23,13 +23,17 @@ Extension.NodeAttr(options)
 Extension.MarkSpec(options)
 Extension.MarkAttr(options)
 
-Extension.Commands(commands)
-Extension.Keymap(bindings)
+Command.Tag(name)<Self, Args>()
+Command.define(tag, implementation)
+Extension.Commands(...definitions)
+Extension.Keymap(...bindings)
 
 Extension.Require(serviceTag)
 
-Editor.layer(options)
-Editor.make(options)
+EditingCore.make(options)
+EditingCore.layer(options)
+EditingCore.create(options)
+Editor.mount(core, element)
 createEditor(options)
 ```
 
@@ -49,7 +53,8 @@ The repository can use internal packages for separation, while the public API is
 Core imports:
 
 ```ts
-import { Editor, Extension, Command, Priority, createEditor } from "effect-prosemirror"
+import { EditingCore, Editor, Extension, Command, Priority, createEditor } from "effect-prosemirror"
+import { EditingCore } from "effect-prosemirror/core/EditingCore"
 import { Editor } from "effect-prosemirror/core/Editor"
 import { Extension } from "effect-prosemirror/core/Extension"
 import { Command } from "effect-prosemirror/core/Command"
@@ -137,7 +142,7 @@ Extensions support priority as a pipeable modifier:
 ```ts
 Extension.union(
   Extension.MarkSpec({ name: "bold" }),
-  Extension.Commands({ toggleBold: Command.define({ run }) }),
+  Extension.Commands(Command.define(ToggleBold, { run })),
 ).pipe(Extension.priority(Priority.High))
 ```
 
@@ -247,19 +252,27 @@ The current schema merge entry point is `EditorSchema.collect(extension)`. It co
 
 `EditorSchema.create(extension)` builds the real ProseMirror schema from collected contributions. Missing attr targets are reported as `MissingSchemaTargetsError`; invalid ProseMirror schema definitions are wrapped in `InvalidEditorSchemaError`. Attribute parse/serialize wrapping is applied during collection. Type-level Final Validation diagnostics remain a separate follow-up step.
 
+Schema compilation is memoized by immutable Extension object identity. Reusing the same Extension value returns the same ProseMirror Schema instance across Editing Cores, which makes strict `InitialContent.Node(node)` usable without weakening its Schema identity check. Structurally similar but independently composed Extensions still produce distinct Schema instances and use `InitialContent.JSON.fromNode` for explicit conversion.
+
 ## Commands
 
 Commands are synchronous ProseMirror editing operations. A command creator receives user-facing arguments and returns a synchronous ProseMirror command.
 
 ```ts
-Extension.Commands({
-  toggleBold: Command.define({
+export class ToggleBold extends Command.Tag("toggleBold")<ToggleBold, []>() {}
+export class SetTextColor extends Command.Tag("setTextColor")<
+  SetTextColor,
+  [options: { readonly color: string }]
+>() {}
+
+Extension.Commands(
+  Command.define(ToggleBold, {
     run: () => (state, dispatch, view) => {
       return true
     },
   }),
 
-  setTextColor: Command.define({
+  Command.define(SetTextColor, {
     run: (options: { color: string }) => (state, dispatch) => {
       return true
     },
@@ -267,39 +280,48 @@ Extension.Commands({
       return false
     },
   }),
-})
+)
 ```
 
-`Extension.Commands` stores a named map of `Command.define` values. `run` is a creator whose user-facing parameters produce a ProseMirror `Command`; optional `isActive` uses those same user-facing parameters and produces a synchronous `(state) => boolean` query.
+A Command Tag is a public contract containing the command name and user-facing parameter tuple. It is independent of any concrete implementation, so Keymaps and other consumers can depend on the Tag without importing an implementation. `Command.define(tag, options)` provides one implementation of that contract. `Extension.Commands` contributes one or more definitions.
+
+`run` is a creator whose user-facing parameters produce a ProseMirror `Command`; optional `isActive` uses those same user-facing parameters and produces a synchronous `(state) => boolean` query. The Tag constrains both creators to its parameter tuple.
 
 The composed editor exposes a typed Command Surface:
 
 ```ts
-editor.commands.toggleBold()
-editor.commands.setTextColor({ color: "red" })
+core.commands.run(ToggleBold)
+core.commands.run(SetTextColor, { color: "red" })
 ```
 
-Command Surface methods execute against the current editor state and return `boolean`. They do not return ProseMirror command functions.
+The Command Surface is driven by Command Tags and does not generate methods from their public string names. `run` executes against the current editor state and returns `boolean`; it does not return a ProseMirror command function.
 
-Command Surface methods also expose synchronous state queries:
+The surface is parameterized by the union of Command Tags implemented by the Editing Core's finalized Extension. Passing a declared Tag that the core does not implement is a compile-time error. Declaring a Tag does not make it globally executable; it enters a core's surface only through at least one contributed Command Definition.
+
+At runtime, JavaScript or unsafe TypeScript may still pass an unavailable Tag. The surface raises an Effect `CommandNotAvailableError` containing the public command name rather than returning `false`. `false` is reserved for a known command chain that cannot handle the current state. A destroyed Editing Core remains the previously defined lifecycle exception: its Command Surface operations return `false` without attempting lookup or execution.
+
+If an available Command Definition or the ProseMirror Command it creates throws, the surface wraps the exception in one Effect `CommandExecutionError` shape containing the public command name, `operation: "run" | "canRun" | "isActive"`, and the original value as `cause`. The synchronous success path remains `boolean`; no raw extension or ProseMirror exception crosses the public boundary.
+
+The surface also exposes synchronous state queries through the same Tag contract:
 
 ```ts
-editor.commands.toggleBold.canExec()
-editor.commands.toggleBold.isActive()
-
-editor.commands.setTextColor.canExec({ color: "red" })
-editor.commands.setTextColor.isActive({ color: "red" })
+core.commands.canRun(ToggleBold)
+core.commands.isActive(ToggleBold)
+core.commands.canRun(SetTextColor, { color: "red" })
+core.commands.isActive(SetTextColor, { color: "red" })
 ```
 
-`canExec` is derived by running the command without dispatch. `isActive` is also synchronous and reads the current editor state. The first phase should support `isActive` on `Command.define`, while keeping it optional.
+`canRun` is derived by running the command without dispatch. `isActive` is also synchronous and reads the current editor state. The first phase should support `isActive` on `Command.define`, while keeping it optional.
 
-When `isActive` is provided, its user-facing parameters must match `run`. If `isActive` is omitted, the command surface still exposes `.isActive(...)`, which returns `false`.
+Command Definitions retain ProseMirror's original `(state, dispatch?, view?) => boolean` command signature. `EditingCore.commands` supplies the current state and dispatch but leaves the optional `view` argument `undefined`. A future mounted `Editor.commands` facade and `prosemirror-keymap` execution supply the real `EditorView`. A view-dependent command may therefore return `false` when invoked on an unmounted Editing Core and succeed when invoked through a mounted Editor Instance. The core never creates, stores, or fakes an `EditorView` to change this behavior.
 
-Same-named commands may merge only when their parameter types are compatible. The merge semantics are synchronous chaining: commands are tried in priority order until one returns `true`.
+When `isActive` is provided, its user-facing parameters must match the Command Tag. If `isActive` is omitted, the command surface still exposes `.isActive(...)`, which returns `false`.
 
-For same-named command merges, state queries use `some` semantics. `canExec` is true if any merged command can execute. `isActive` is true if any merged command reports active.
+Multiple definitions of one Command Tag merge into a synchronous chain: definitions are tried in priority order until one returns `true`. Runtime Tag identity is nominal, so implementations must reuse the same exported Tag to participate in the merge. Two distinct runtime Tags with the same public name fail Final Validation with a `DuplicateCommandName` diagnostic even when their parameter tuples are equal.
 
-`Command.define({ run })` is required instead of accepting arbitrary functions. This brands command definitions, keeps synchronous return types explicit, and leaves room for future command metadata or state queries without changing the API shape.
+For multiple definitions of the same Command Tag, state queries use `some` semantics. `canRun` is true if any merged definition can execute. `isActive` is true if any merged definition reports active.
+
+`Command.define(tag, { run })` is required instead of accepting arbitrary functions. This associates the implementation with its public contract, keeps synchronous return types explicit, and leaves room for future command metadata or state queries without changing the API shape. It supersedes the earlier named-record form.
 
 `run` should not receive Effect services or an editor-specific context. Command follows ProseMirror's existing synchronous command concept, so service-dependent or asynchronous workflows belong to the future Action API.
 
@@ -307,21 +329,38 @@ For same-named command merges, state queries use `some` semantics. `canExec` is 
 
 The first phase supports static keymaps that reference the Command Surface.
 
-No-argument commands can be bound by name:
+Key chords are structured values rather than public ProseMirror key-name strings:
 
 ```ts
-Extension.Keymap({
-  "Mod-b": "toggleBold",
+const chord = KeyChord.make({
+  modifiers: [Modifier.Mod],
+  key: Key.Character("b"),
 })
 ```
 
-Commands with one argument can be bound with a tuple:
+`Key` is a closed tagged union of logical keyboard values, for example `Key.Character("b")`, `Key.Digit(1)`, `Key.Enter`, `Key.ArrowUp`, and `Key.Function(5)`. Standard named keys are explicit API members. `Key.Character(value)` is the synchronous convenience constructor and throws Effect `InvalidKeyError` for invalid dynamic input; `Key.decodeCharacter(value)` returns an Effect with that same tagged error in its error channel. There is no public `Key.Raw(string)` or `Key.Named(string)` escape hatch; missing standard keys are added explicitly to the union. It aligns with `KeyboardEvent.key` and ProseMirror's logical key-name semantics. Physical `KeyboardEvent.code` bindings such as `"KeyB"` are outside the public API so bindings respect the active keyboard layout.
+
+Key modifiers form an unordered set containing only `Modifier.Mod`, `Modifier.Ctrl`, `Modifier.Alt`, `Modifier.Shift`, and `Modifier.Meta`. `KeyChord.make` normalizes them into a stable order and removes duplicates, so `[Modifier.Mod, Modifier.Alt]` and `[Modifier.Alt, Modifier.Mod]` have the same chord identity. Aliases such as `Cmd` and `Control` are not part of the public model.
+
+`Mod` remains platform-abstract in the Static Keymap and Editing Core. The future View adapter must not implement its own platform detection or key-event matching. It preserves binding-chain precedence while delegating platform-specific `Mod` resolution, shifted-character handling, key normalization, and keyboard event matching to `prosemirror-keymap`. If abstract chords overlap on a particular platform, normal ProseMirror keymap precedence and `false` fallthrough determine which binding handles the event.
+
+A Command Invocation captures an immutable, complete argument tuple when the Static Keymap is constructed:
 
 ```ts
-Extension.Keymap({
-  "Mod-Alt-1": ["setHeading", { level: 1 }],
-})
+const level: HeadingLevel = 1
+const invocation = CommandInvocation.make(SetHeading, { level })
+const binding = Keymap.bind(chord, invocation)
 ```
+
+`SetHeading` is a Command Tag carrying both the public command name and its user-facing parameter tuple. `CommandInvocation.make` does not accept a bare string, so it checks `{ level }` immediately. The Tag is separate from its Command Definitions; Final Validation checks that the complete Extension Union provides at least one implementation for it.
+
+A Keymap may reference a Command Tag supplied later by another Extension. `Keymap.bind` and `Extension.union` preserve that Forward Reference without requiring an implementation. `EditingCore.create`, `EditingCore.make`, and `EditingCore.layer` are the first complete-editor boundaries and report a typed `MissingCommandImplementation` diagnostic inside Effect `FinalValidationError` when the final Extension Union still lacks an implementation.
+
+Arguments that must be computed at runtime are passed through the Command Surface and are not represented by a Static Keymap Command Invocation.
+
+Each `Keymap.bind` maps exactly one Key Chord to one Command Invocation. It does not accept an invocation list and there is no separate sequence abstraction. Authors express fallback behavior by contributing multiple bindings for the same chord, which are composed by Keymap Merge.
+
+Bindings for the same Key Chord merge into a short-circuiting chain. Bindings run by descending contribution priority, with Extension Union declaration order breaking ties. A Command Invocation returning `false` passes handling to the next binding; the first invocation returning `true` stops the chain and consumes the key. Duplicate chords are therefore composable rather than a validation error.
 
 The first phase does not support runtime keymap mutation. Dynamic keymaps are deferred until Effect-backed Plugin support is designed.
 
@@ -344,20 +383,20 @@ createEditor({
 
 The first phase does not allow arbitrary business Layers to be embedded inside extensions.
 
-`Editor.layer` must expose extension requirements in its environment type. If an extension requires `AiClient`, then the editor layer still requires `AiClient`:
+`EditingCore.layer` exposes extension requirements in its environment type. If an extension requires `AiClient`, then the core layer still requires `AiClient`:
 
 ```ts
-Editor.layer({ extension, element })
-// Layer.Layer<EditorService, EditorError, AiClient>
+EditingCore.layer({ extension })
+// Layer.Layer<EditingCore, EditingCoreError, AiClient>
 ```
 
 The application satisfies those requirements by providing Layers around the editor layer:
 
 ```ts
-Effect.provide(program, Layer.mergeAll(AiClientLive, Editor.layer({ extension, element })))
+Effect.provide(program, Layer.mergeAll(AiClientLive, EditingCore.layer({ extension })))
 ```
 
-`createEditor` performs Final Validation against the provided `layer`. Missing service implementations should produce Typed Diagnostics.
+Editing Core construction performs Final Validation against the provided requirements. The mounted `createEditor` convenience constructor inherits that validation. Missing service implementations produce Typed Diagnostics.
 
 In the MVP, `Extension.Require(Tag)` is explicit because schema, command, and keymap contributions do not run Effect programs directly. Future `Extension.Actions` and `Extension.Plugin` APIs should automatically accumulate requirements from their Effect environment types, while `Extension.Require` remains available for explicit external contracts.
 
@@ -365,31 +404,69 @@ In the MVP, `Extension.Require(Tag)` is explicit because schema, command, and ke
 
 The library provides an Effect-native service layer and a convenience creation API.
 
-`Editor.layer` is the primary Effect-native entry point. It creates an Editor Scope and provides the current editor as an `EditorService` service:
+`EditingCore` is both the runtime service contract and its Effect Context Tag. `EditingCore.layer` is the primary Effect-native entry point. It creates an Editor Scope and provides the current Editing Core:
 
 ```ts
 const program = Effect.gen(function* () {
-  const editor = yield* EditorService
+  const core = yield* EditingCore
 
-  yield* editor.transact(({ tr }) => {
+  yield* core.transact(({ tr }) => {
     return tr.insertText("hello")
   })
-}).pipe(Effect.provide(Editor.layer({ extension, element })), Effect.provide(appLayer))
+}).pipe(Effect.provide(EditingCore.layer({ extension })), Effect.provide(appLayer))
 ```
 
-`Editor.make` may exist as a lower-level constructor used by `Editor.layer`, but `Editor.layer` is the API that lets other Effect programs depend on the current editor through the environment.
+`EditingCore.make(options)` is the lower-level scoped constructor with `Effect.Effect<EditingCore, EditingCoreError, Requirements | Scope>`. `EditingCore.layer(options)` provides `Layer.Layer<EditingCore, EditingCoreError, Requirements>`. `EditingCore.create(options)` is the synchronous convenience constructor: it owns an internal Scope until `core.destroy()` and throws the same tagged errors that Effect-native construction places in its error channel. No separate `EditorService` contract is introduced.
 
-`createEditor` is the convenience constructor for application and framework code:
+The service obtained through `yield* EditingCore` exposes the same synchronous ProseMirror-oriented surface as `EditingCore.create`: command operations and `transact` return direct booleans, while state and schema are direct getters. Effect manages construction, requirements, Scope, and future Actions; it does not duplicate these operations as `runEffect` or `transactEffect` and does not turn a synchronous ProseMirror Command into an Effect Command. Exceptional synchronous failures are still normalized to the agreed `Data.TaggedError` values.
+
+`Editor.mount` binds an existing core to a DOM element and returns an Editor Instance. `createEditor` is the convenience constructor for application and framework code that creates and mounts a core in one call:
 
 ```ts
-const editor = createEditor({
+const core = EditingCore.create({
   extension,
+  initialContent,
+})
+
+const editor = Editor.mount(core, element)
+
+const mountedEditor = createEditor({
+  extension,
+  initialContent,
   element,
-  layer,
 })
 ```
 
-Each created editor owns an Editor Scope. In the Effect-native API, the scope is managed by `Layer` / `Scope`. In the convenience API, `createEditor` owns the scope and exposes `destroy(): void`.
+One Editing Core may have at most one active Editor Mount. Calling `Editor.mount` again while its current Editor Instance is mounted fails with an Effect `EditorAlreadyMountedError`. Selection, focus, DOM composition, and View-dependent command context are intentionally not shared across multiple active Views.
+
+If `Editor.mount(core, element)` fails during EditorView or plugin View initialization, it cleans up every partial View resource, releases the active-mount reservation, and raises `EditorMountError { cause }`. Because `Editor.mount` borrows an existing core, that core remains live and unmounted so the caller may correct the problem and retry. Destroyed and already-mounted cores retain their separate `EditorDestroyedError` and `EditorAlreadyMountedError` classifications.
+
+`createEditor` owns the core it creates, so its construction is transactional across core creation and mount. If mounting fails after `EditingCore.create` succeeds, it calls `core.destroy()` before rethrowing the original `EditorMountError`. The core and View become invalid synchronously while Scope finalizers continue through the destroy Promise. The synchronous constructor does not await cleanup; it observes cleanup rejection through the Effect runtime without replacing the mount failure.
+
+`editor.unmount()` is idempotent. It destroys the active EditorView and removes state synchronization but leaves the Editing Core, its current state, and its Editor Scope alive. The core may then be mounted to another element. `core.destroy()` is the irreversible boundary: it synchronously marks the core destroyed, automatically unmounts any active View, prevents every future mount, and returns a shared `Promise<void>` that completes after the Editor Scope's potentially asynchronous finalizers finish.
+
+Every Editor Instance, whether returned by `Editor.mount` or `createEditor`, exposes both `unmount()` and `destroy()`. `editor.destroy()` delegates to the same irreversible lifecycle transition as `core.destroy()`, while `editor.unmount()` remains View-only. The API does not infer cleanup ownership from which constructor produced the instance.
+
+Unmounting permanently invalidates that Editor Instance. If the live core is later mounted again, the old handle never follows or aliases the new View. Apart from idempotent `unmount()` and `destroy()`, its View, state, schema, command, and transaction operations fail with an Effect `EditorUnmountedError`. Callers that need to continue editing use the explicit Editing Core or the newly mounted Editor Instance; there is no silent fallback from a stale View-bound surface to core-only execution.
+
+Each Editing Core owns an Editor Scope. In the Effect-native API, the scope is managed by `Layer` / `Scope`. In the convenience API, `createEditor` owns the scope and exposes `destroy(): Promise<void>` on the mounted Editor Instance.
+
+The first Editing Core accepts Initial Content through an Effect-style readonly tagged union:
+
+```ts
+type InitialContent =
+  | { readonly _tag: "Node"; readonly node: Node }
+  | { readonly _tag: "JSON"; readonly json: NodeJSON }
+  | { readonly _tag: "HTML"; readonly html: string }
+```
+
+`Node` and `JSON` create state without a DOM. `HTML` uses the browser's global `document`; creating an Editing Core with HTML Initial Content outside a browser fails with `InitialContentDocumentUnavailableError` rather than introducing a DOM polyfill into the Editing Core.
+
+`InitialContent.Node(node)` directly uses a Node only when `node.type.schema === core.schema`; a Node from another Schema fails with `InvalidInitialContentError { source: "Node", reason: "SchemaMismatch" }` rather than silently replacing the core schema. For an intentional cross-schema conversion, `InitialContent.JSON.fromNode(node)` snapshots `node.toJSON()` and then rebuilds it through the target schema's normal JSON path.
+
+Initial Content adds no separate generic Effect Schema decoder for `NodeJSON`. Callers may decode unknown external data with their own `Schema.decodeUnknown` program and pass the result to `InitialContent.JSON`. ProseMirror `Node.fromJSON` remains the authoritative validation and construction step for node types, marks, attrs, and content expressions; the existing Effect Schema attribute support participates there through compiled ProseMirror attribute validation.
+
+`initialContent` is optional. When omitted, the Editing Core uses `schema.topNodeType.createAndFill()` to create the initial document. A null result fails with `InitialContentCreationError { reason: "TopNodeCannotCreateAndFill" }`. Invalid explicit Node, JSON, or HTML content fails with `InvalidInitialContentError { source: "Node" | "JSON" | "HTML", cause }`. These tagged errors never expose raw ProseMirror exceptions.
 
 ## Editor Instance API
 
@@ -401,7 +478,9 @@ editor.state
 editor.schema
 ```
 
-`state` and `schema` are getters. They must read from `editor.view.state` each time instead of caching the state at editor creation.
+`state` and `schema` are getters backed by the Editing Core, which remains the sole state owner after mounting. The mount adapter maintains `core.state === editor.view.state`: DOM transactions enter the core through the View's `dispatchTransaction`, and every accepted core state change is projected back with `view.updateState(...)`.
+
+If `view.updateState` throws after the core has accepted a transaction, the core does not attempt to roll back plugin state or external plugin effects. It retains the accepted state, immediately detaches and destroys the failing View, permanently invalidates that Editor Instance, and raises an Effect `EditorViewSynchronizationError { cause }`. The still-live core may then be mounted again.
 
 Transaction submission should use a short-lived synchronous transaction boundary:
 
@@ -413,6 +492,8 @@ editor.transact(({ state, view, schema, tr }) => {
 
 `transact` reads the latest `EditorState`, creates `state.tr`, passes it to the callback, and immediately dispatches the returned transaction.
 
+All transaction sources use the same core-owned dispatch path, including `EditingCore.commands`, mounted `Editor.commands`, Static Keymaps, explicit `transact`, and transactions produced by DOM input. Mounting never transfers state ownership to `EditorView` and never permits the core and View states to evolve independently.
+
 ```ts
 type TransactionContext = {
   state: EditorState
@@ -421,48 +502,45 @@ type TransactionContext = {
   tr: Transaction
 }
 
-type Transact = (fn: (ctx: TransactionContext) => Transaction | null | undefined | false) => boolean
+type Transact = (fn: (ctx: TransactionContext) => Transaction | false) => boolean
 ```
 
 `transact` callbacks must be synchronous. Asynchronous work should complete first and then reenter through `transact` or the future Reentry API so the transaction is built from the current state.
 
-Direct transaction dispatch may be exposed for advanced usage:
+The callback must explicitly return a Transaction or `false`. A returned Transaction enters the complete ProseMirror state application path even when it has no document steps, because it may carry selection changes or plugin metadata. `false` is the sole no-write result. `null`, `undefined`, `true`, and Promise values are invalid, so a missing `return` is caught by the callback type rather than silently becoming a no-op.
 
-```ts
-editor.dispatch(tr)
-```
+The core applies returned transactions with ProseMirror's `state.applyTransaction(transaction)`. `transact` returns `true` only when the root transaction is accepted; it then adopts the resulting final state, including all `appendTransaction` work. If a plugin's `filterTransaction` rejects the root transaction, the state remains unchanged and `transact` returns `false`. Selection-only or metadata-only accepted transactions still return `true`.
 
-The primary path should remain `editor.transact(...)` and typed command surface methods, because holding a transaction across asynchronous boundaries can make it stale.
+An exception from the callback or `applyTransaction` is never exposed raw. Both become an Effect `TransactionExecutionError` with `phase: "callback" | "apply"` and the original value as `cause`; callback failures leave state unchanged. Nested public writes use the distinct `TransactionReentryError`.
 
-The Effect-native `EditorService` service exposes Effect-returning operations:
+The callback is also a non-reentrant write boundary. It may inspect its context and call read-only `canRun` or `isActive` queries, but nested `transact` and a `commands.run` that would enter the dispatch path fail with an Effect `TransactionReentryError`. This prevents an inner write from advancing the core while the outer callback still holds a transaction based on the previous state. ProseMirror plugin application and `appendTransaction` processing inside one internal state application are not treated as public reentry.
 
-```ts
-editor.transact(fn): Effect.Effect<boolean>
-```
+The first public API does not add `core.dispatch(tr)` or `editor.dispatch(tr)`. Editing Core commands and the View adapter use an internal dispatch path, while host code uses `transact` so each transaction begins from the latest state. Advanced mounted integrations still have ProseMirror's original `editor.view.dispatch(tr)`, which the adapter routes through the core-owned state path. Avoiding a duplicate public dispatch method reduces accidental submission of transactions retained across asynchronous boundaries.
 
 The convenience `createEditor` instance exposes synchronous operations:
 
 ```ts
 editor.transact(fn): boolean
-editor.destroy(): void
+editor.destroy(): Promise<void>
 ```
 
-`destroy()` is idempotent. After destroy, command surface methods and `transact` return `false`. Accessing `state` or `schema` after destroy should fail with an `EditorDestroyedError` rather than returning stale data.
+`EditingCore.destroy()` is idempotent and returns the same completion Promise on repeated calls. The core becomes destroyed before that Promise is returned: Command Surface methods and `transact` return `false`; accessing `state` or `schema`, or attempting `Editor.mount`, fails with an `EditorDestroyedError` rather than returning stale data or reviving the scope. The Promise only represents completion of Editor Scope finalizers.
 
 ## Final Validation
 
-Partial extensions are allowed, but creating an editor requires Final Validation.
+Partial extensions are allowed, but creating an Editing Core requires Final Validation.
 
 Final Validation checks that:
 
 - node attributes target existing node specs
 - mark attributes target existing mark specs
-- keymaps reference existing commands
+- keymaps reference Command Tags with at least one implementation
 - keymap bindings provide required command arguments
+- distinct Command Tags do not reuse one public command name
 - the schema is complete enough to create a ProseMirror editor
 - required services are provided
 
-Type-level failures should be Typed Diagnostics, not opaque `never` failures. The first Final Validation slice covers node and mark attrs that target missing specs. `Editor.layer`, `Editor.make`, and `createEditor` require a valid extension at the type level. `FinalValidation` resolves to `unknown` for a valid extension and exposes a diagnostic result for an invalid one, for example:
+Type-level failures should be Typed Diagnostics, not opaque `never` failures. The first Final Validation slice covers node and mark attrs that target missing specs. `EditingCore.create`, `EditingCore.make`, and `EditingCore.layer` require a valid extension at the type level. The mounted `createEditor` convenience constructor inherits that validation by creating an Editing Core before mounting. `FinalValidation` resolves to `unknown` for a valid extension and exposes a diagnostic result for an invalid one, for example:
 
 ```ts
 type MissingNodeTarget = {
@@ -475,32 +553,21 @@ type MissingNodeTarget = {
 
 An extension with a valid Forward Reference passes Final Validation because validation examines the completed Extension Union rather than an individual contribution.
 
-Runtime validation should mirror the type-level checks.
+Runtime validation mirrors the type-level checks through one Effect `FinalValidationError { diagnostics }`, containing all unresolved and conflicting contributions found at the complete-core boundary. It does not stop at the first error. The lower-level `EditorSchema.create` API retains its narrower schema-specific error model when used directly.
 
-Runtime validation errors should follow Effect conventions and use `Data.TaggedError`, not bare strings or generic errors:
+Runtime validation errors should follow Effect conventions and use `Data.TaggedError`, not bare strings or generic errors. Public APIs do not directly expose raw ProseMirror exceptions; they may retain one as a tagged error's `cause`.
 
 ```ts
 import { Data } from "effect"
 
-class MissingNodeSpecError extends Data.TaggedError("MissingNodeSpecError")<{
-  readonly node: string
-  readonly attr: string
-}> {}
-
-class MissingMarkSpecError extends Data.TaggedError("MissingMarkSpecError")<{
-  readonly mark: string
-  readonly attr: string
-}> {}
-
-class MissingCommandError extends Data.TaggedError("MissingCommandError")<{
-  readonly command: string
-  readonly key: string
+class FinalValidationError extends Data.TaggedError("FinalValidationError")<{
+  readonly diagnostics: readonly FinalValidationDiagnostic[]
 }> {}
 
 class EditorDestroyedError extends Data.TaggedError("EditorDestroyedError")<{}> {}
 ```
 
-Effect-native APIs report these errors through the Effect error channel. Convenience APIs may throw, but should throw the same tagged error values.
+Effect-returning construction APIs report these errors through the Effect error channel. Direct synchronous ProseMirror-oriented operations and convenience constructors throw the same tagged error values.
 
 ## Type Model
 
@@ -514,15 +581,16 @@ type ExtensionSpec = {
   NodeAttrs: Record<string, Record<string, AttrInfo>>
   MarkSpecs: Record<string, MarkSpecInfo>
   MarkAttrs: Record<string, Record<string, AttrInfo>>
-  Commands: Record<string, CommandCreator>
-  Keymaps: Record<string, KeymapBinding>
+  CommandTags: readonly CommandTagInfo[]
+  CommandDefinitions: readonly CommandDefinitionInfo[]
+  KeyBindings: readonly KeyBindingInfo[]
   Requirements: unknown
 }
 ```
 
-`Extension.union` performs local merge checks that are meaningful at composition time. For example, same-named commands must have compatible parameters because command chaining is decided by the union.
+`Extension.union` preserves raw contributions and local ordering without rejecting Forward References. At complete-core runtime Final Validation, definitions referencing the same Command Tag form a command chain, while distinct runtime Tags with the same public name produce a `DuplicateCommandName` diagnostic.
 
-Completeness checks are deferred to `Editor.make` and `createEditor`. These include missing node specs for node attrs, missing mark specs for mark attrs, missing command targets for keymaps, incomplete schema requirements, and missing service implementations.
+Completeness checks are deferred to `EditingCore.create`, `EditingCore.make`, and `EditingCore.layer`. These include missing node specs for node attrs, missing mark specs for mark attrs, missing Command Tag implementations for keymaps, incomplete schema requirements, and missing service implementations.
 
 Typed Diagnostics should carry readable details:
 

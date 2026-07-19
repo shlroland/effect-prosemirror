@@ -1,55 +1,82 @@
 import type { Command as ProseMirrorCommand, EditorState } from "prosemirror-state"
 
+const CommandTagTypeId = Symbol("effect-prosemirror/CommandTag")
 const CommandDefinitionTypeId = Symbol("effect-prosemirror/CommandDefinition")
 
-export type CommandCreator<Args extends readonly any[] = readonly any[]> = (
-  ...args: Args
-) => ProseMirrorCommand
+type MutableTuple<Args extends readonly unknown[]> = Args extends readonly [...infer Values]
+  ? Values
+  : never
 
-export type IsActive<Args extends readonly any[] = readonly any[]> = (
-  ...args: Args
-) => (state: EditorState) => boolean
-
-export interface CommandDefinition<
-  Run extends CommandCreator = CommandCreator,
-  Active extends IsActive<Parameters<Run>> | undefined = IsActive<Parameters<Run>> | undefined,
-> {
-  readonly _tag: "CommandDefinition"
-  readonly [CommandDefinitionTypeId]: typeof CommandDefinitionTypeId
-  readonly run: Run
-  readonly isActive?: Active
-}
-
-type IsActiveCreator = (...args: readonly any[]) => (state: EditorState) => boolean
-
-type IsEqual<Left, Right> =
-  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
-    ? true
-    : false
-
-type MatchingIsActive<Run extends CommandCreator, Active extends IsActiveCreator> =
-  IsEqual<Parameters<Run>, Parameters<Active>> extends true ? Active : never
-
-export function define<const Run extends CommandCreator>(options: {
-  readonly run: Run
-}): CommandDefinition<Run>
-
-export function define<
-  const Run extends CommandCreator,
-  const Active extends IsActiveCreator,
->(options: {
-  readonly run: Run
-  readonly isActive: Active & MatchingIsActive<Run, Active>
-}): CommandDefinition<Run, Active>
-
-export function define(options: {
-  readonly run: CommandCreator
-  readonly isActive?: IsActiveCreator
-}): CommandDefinition<CommandCreator, IsActiveCreator | undefined> {
-  return {
-    _tag: "CommandDefinition",
-    [CommandDefinitionTypeId]: CommandDefinitionTypeId,
-    run: options.run,
-    ...(options.isActive ? { isActive: options.isActive } : {}),
+export interface CommandTag<Self, Name extends string, Args extends readonly unknown[]> {
+  readonly _tag: "CommandTag"
+  readonly commandName: Name
+  readonly [CommandTagTypeId]: {
+    readonly _Self: (_: Self) => Self
+    readonly _Args: Args
   }
 }
+
+export namespace CommandTag {
+  export type Any = CommandTag<any, string, readonly unknown[]>
+  export type Name<Tag extends Any> = Tag extends CommandTag<any, infer Name, any> ? Name : never
+  export type Args<Tag extends Any> =
+    Tag extends CommandTag<any, any, infer Args> ? MutableTuple<Args> : never
+}
+
+export interface CommandTagClass<
+  Self,
+  Name extends string,
+  Args extends readonly unknown[],
+> extends CommandTag<Self, Name, Args> {
+  new (_: never): CommandTagClassShape<Name, Args>
+}
+
+export interface CommandTagClassShape<Name extends string, Args extends readonly unknown[]> {
+  readonly [CommandTagTypeId]: typeof CommandTagTypeId
+  readonly Name: Name
+  readonly Args: Args
+}
+
+export const Tag =
+  <const Name extends string>(commandName: Name) =>
+  <Self, Args extends readonly unknown[]>(): CommandTagClass<Self, Name, Args> => {
+    function TagClass() {}
+
+    Object.defineProperties(TagClass, {
+      _tag: { value: "CommandTag", enumerable: true },
+      commandName: { value: commandName, enumerable: true },
+      [CommandTagTypeId]: { value: undefined },
+    })
+
+    return TagClass as unknown as CommandTagClass<Self, Name, Args>
+  }
+
+export type CommandCreator<Args extends readonly unknown[] = readonly unknown[]> = (
+  ...args: MutableTuple<Args>
+) => ProseMirrorCommand
+
+export type IsActive<Args extends readonly unknown[] = readonly unknown[]> = (
+  ...args: MutableTuple<Args>
+) => (state: EditorState) => boolean
+
+export interface CommandDefinition<Tag extends CommandTag.Any = CommandTag.Any> {
+  readonly _tag: "CommandDefinition"
+  readonly [CommandDefinitionTypeId]: typeof CommandDefinitionTypeId
+  readonly tag: Tag
+  readonly run: CommandCreator<CommandTag.Args<Tag>>
+  readonly isActive?: IsActive<CommandTag.Args<Tag>>
+}
+
+export const define = <const Tag extends CommandTag.Any>(
+  tag: Tag,
+  options: {
+    readonly run: CommandCreator<CommandTag.Args<Tag>>
+    readonly isActive?: IsActive<CommandTag.Args<Tag>>
+  },
+): CommandDefinition<Tag> => ({
+  _tag: "CommandDefinition",
+  [CommandDefinitionTypeId]: CommandDefinitionTypeId,
+  tag,
+  run: options.run,
+  ...(options.isActive ? { isActive: options.isActive } : {}),
+})

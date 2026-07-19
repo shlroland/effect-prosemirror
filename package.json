@@ -22,6 +22,14 @@
       "types": "./dist/core/Command.d.ts",
       "default": "./dist/core/Command.js"
     },
+    "./core/CommandInvocation": {
+      "types": "./dist/core/CommandInvocation.d.ts",
+      "default": "./dist/core/CommandInvocation.js"
+    },
+    "./core/EditingCore": {
+      "types": "./dist/core/EditingCore.d.ts",
+      "default": "./dist/core/EditingCore.js"
+    },
     "./core/Editor": {
       "types": "./dist/core/Editor.d.ts",
       "default": "./dist/core/Editor.js"
@@ -33,6 +41,22 @@
     "./core/Extension": {
       "types": "./dist/core/Extension.d.ts",
       "default": "./dist/core/Extension.js"
+    },
+    "./core/InitialContent": {
+      "types": "./dist/core/InitialContent.d.ts",
+      "default": "./dist/core/InitialContent.js"
+    },
+    "./core/Key": {
+      "types": "./dist/core/Key.d.ts",
+      "default": "./dist/core/Key.js"
+    },
+    "./core/KeyChord": {
+      "types": "./dist/core/KeyChord.d.ts",
+      "default": "./dist/core/KeyChord.js"
+    },
+    "./core/Keymap": {
+      "types": "./dist/core/Keymap.d.ts",
+      "default": "./dist/core/Keymap.js"
     },
     "./core/Priority": {
       "types": "./dist/core/Priority.d.ts",

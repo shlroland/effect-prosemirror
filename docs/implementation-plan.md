@@ -77,49 +77,55 @@ Validation:
 
 Implement typed synchronous command contributions.
 
+Status: complete for the DOM-independent Static Keymap model. EditorView event installation remains in Phase 5.
+
 Deliverables:
 
-- `Command.define({ run, isActive? })` (complete)
-- `Extension.Commands` (complete)
-- typed Command Surface
-- same-name command chain merge
-- `canExec` derived from dry-run command execution
-- `isActive` with matching `run` parameters
-- `Extension.Keymap`
-- static keymap bindings to command references
+- Effect-style `Command.Tag(name)<Self, Args>()` contract (complete)
+- `Command.define(tag, { run, isActive? })` (complete)
+- variadic `Extension.Commands(...definitions)` (complete)
+- Tag-driven typed `run`, `canRun`, and `isActive` Command Surface (complete)
+- priority-ordered Command Merge by shared Tag identity (complete)
+- `canRun` derived from dry-run command execution (complete)
+- `isActive` constrained by the Tag argument tuple (complete)
+- structured `Key`, `KeyChord`, and `CommandInvocation` values (complete)
+- `Extension.Keymap(...bindings)` and Static Keymap Merge (complete)
+- Final Validation for missing keymap Command implementations (complete)
 
 Validation:
 
-- type tests for command surface inference
-- type tests for incompatible same-name command merge
-- type tests for keymap command references and arguments
-- runtime tests for command chain order
-- runtime tests for `canExec` and `isActive`
+- type tests for Command Tag arguments and available core commands (complete)
+- type tests for keymap command references and arguments (complete)
+- runtime tests for command chain order (complete)
+- runtime tests for `canRun` and `isActive` (complete)
+- runtime tests for KeyChord normalization and Keymap Merge (complete)
 
-## Phase 5: Editor layer
+## Phase 5: Editing Core and Editor mount
 
 Integrate with ProseMirror and Effect services.
 
+Status: in progress. The executable Editing Core is complete; EditorView mount and service requirements remain.
+
 Deliverables:
 
-- `EditorService`
-- `Editor.layer(options)`
-- lower-level `Editor.make` if needed
+- `EditingCore` Context service contract (complete)
+- scoped `EditingCore.make(options)` (complete)
+- `EditingCore.layer(options)` (complete)
+- convenience `EditingCore.create(options)` (complete)
+- `Editor.mount(core, element)`
 - `createEditor(options)`
 - `editor.view`
-- `editor.state` getter
-- `editor.schema` getter
-- Effect-native `editor.transact`
-- convenience `editor.transact`
-- idempotent `destroy(): void` for `createEditor`
-- `Data.TaggedError` runtime errors
+- core `state` and `schema` getters (complete)
+- synchronous `core.transact` boundary (complete)
+- immediately invalidating, idempotent `destroy(): Promise<void>` with asynchronous Scope finalization (complete)
+- `Data.TaggedError` runtime errors (complete for Editing Core)
 - service requirement propagation from extensions
 
 Validation:
 
-- runtime tests for editor creation
-- runtime tests for transaction submission
-- runtime tests for destroy semantics
+- runtime tests for Editing Core creation (complete)
+- runtime tests for transaction submission (complete)
+- runtime tests for destroy semantics (complete)
 - type tests for service requirements
 - runtime tests for missing services and validation errors
 

@@ -25,6 +25,8 @@ export interface EditorSchemaContributions {
   readonly diagnostics: readonly EditorSchemaDiagnostic[]
 }
 
+const schemaCache = new WeakMap<Extension.Any, ProseMirrorSchema>()
+
 export interface MissingNodeTargetDiagnostic {
   readonly _tag: "MissingNodeTarget"
   readonly type: string
@@ -384,6 +386,9 @@ export const collect = (extension: Extension.Any): EditorSchemaContributions => 
 }
 
 export const create = (extension: Extension.Any): ProseMirrorSchema => {
+  const cached = schemaCache.get(extension)
+  if (cached) return cached
+
   const contributions = collect(extension)
 
   if (contributions.diagnostics.length > 0) {
@@ -393,10 +398,12 @@ export const create = (extension: Extension.Any): ProseMirrorSchema => {
   }
 
   try {
-    return new ProseMirrorSchema({
+    const schema = new ProseMirrorSchema({
       nodes: contributions.nodes,
       marks: contributions.marks,
     })
+    schemaCache.set(extension, schema)
+    return schema
   } catch (cause) {
     throw new InvalidEditorSchemaError({ cause })
   }
