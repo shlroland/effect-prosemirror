@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 
 import * as Command from "../../src/core/Command.js"
@@ -11,6 +11,8 @@ import {
   FinalValidationError,
   InitialContentDocumentUnavailableError,
   InvalidInitialContentError,
+  MissingServiceError,
+  ServiceLayerCreationError,
   TransactionExecutionError,
   TransactionReentryError,
 } from "../../src/core/Error.js"
@@ -26,6 +28,10 @@ const schemaExtension = Extension.union(
 
 class InsertText extends Command.Tag("insertText")<InsertText, [text: string]>() {}
 class IsTextActive extends Command.Tag("isTextActive")<IsTextActive, [text: string]>() {}
+class AuditService extends Context.Tag("test/AuditService")<
+  AuditService,
+  { readonly name: string }
+>() {}
 
 const insertText = Command.define(InsertText, {
   run: (text) => (state, dispatch) => {
@@ -39,6 +45,8 @@ const isTextActive = Command.define(IsTextActive, {
   run: () => () => false,
   isActive: (text) => (state) => state.doc.textContent === text,
 })
+
+const auditServiceLive = Layer.succeed(AuditService, { name: "audit" })
 
 describe("EditingCore", () => {
   it("creates a real schema and EditorState with default content", async () => {
@@ -300,6 +308,57 @@ describe("EditingCore", () => {
     )
 
     expect(documentType).toBe("doc")
+  })
+
+  it("validates Extension service requirements through Effect and synchronous Layers", async () => {
+    const extension = Extension.union(schemaExtension, Extension.Require(AuditService))
+    const makeUnsafe = EditingCore.make as (
+      options: EditingCore.Options,
+    ) => Effect.Effect<EditingCore.Any, EditingCore.CreationError, never>
+    const createUnsafe = EditingCore.create as (options: EditingCore.Options) => EditingCore.Any
+
+    const missingServiceExit = await Effect.runPromiseExit(Effect.scoped(makeUnsafe({ extension })))
+    expect(missingServiceExit).toMatchObject({
+      _tag: "Failure",
+      cause: {
+        _tag: "Fail",
+        error: {
+          _tag: "MissingServiceError",
+          services: ["test/AuditService"],
+        },
+      },
+    })
+    expect(() => createUnsafe({ extension })).toThrow(MissingServiceError)
+    const failingLayer = Layer.fail(new Error("service layer failed")) as unknown as Layer.Layer<
+      AuditService,
+      never,
+      never
+    >
+    expect(() => (EditingCore.create as Function)({ extension, layer: failingLayer })).toThrow(
+      ServiceLayerCreationError,
+    )
+
+    const schemaName = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const core = yield* EditingCore.make({ extension })
+          return core.schema.topNodeType.name
+        }).pipe(Effect.provide(auditServiceLive)),
+      ),
+    )
+    expect(schemaName).toBe("doc")
+
+    const layerSchemaName = await Effect.runPromise(
+      Effect.gen(function* () {
+        const core = yield* EditingCore.EditingCore
+        return core.schema.topNodeType.name
+      }).pipe(Effect.provide(EditingCore.layer({ extension })), Effect.provide(auditServiceLive)),
+    )
+    expect(layerSchemaName).toBe("doc")
+
+    const core = EditingCore.create({ extension, layer: auditServiceLive })
+    expect(core.schema.topNodeType.name).toBe("doc")
+    await core.destroy()
   })
 
   it("aggregates runtime Final Validation diagnostics", () => {

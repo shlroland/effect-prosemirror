@@ -77,7 +77,7 @@ Validation:
 
 Implement typed synchronous command contributions.
 
-Status: complete for the DOM-independent Static Keymap model. EditorView event installation remains in Phase 5.
+Status: complete. Static Keymaps are validated at the Core boundary and installed by the mounted Editor View.
 
 Deliverables:
 
@@ -91,6 +91,7 @@ Deliverables:
 - structured `Key`, `KeyChord`, and `CommandInvocation` values (complete)
 - `Extension.Keymap(...bindings)` and Static Keymap Merge (complete)
 - Final Validation for missing keymap Command implementations (complete)
+- `prosemirror-keymap` View direct-plugin installation (complete)
 
 Validation:
 
@@ -99,12 +100,13 @@ Validation:
 - runtime tests for command chain order (complete)
 - runtime tests for `canRun` and `isActive` (complete)
 - runtime tests for KeyChord normalization and Keymap Merge (complete)
+- jsdom runtime tests for key dispatch, priority chains, false fallthrough, and unmount cleanup (complete)
 
 ## Phase 5: Editing Core and Editor mount
 
 Integrate with ProseMirror and Effect services.
 
-Status: in progress. The executable Editing Core is complete; EditorView mount and service requirements remain.
+Status: complete. The executable Editing Core, `Editor.mount` lifecycle, `createEditor` convenience constructor, and Extension service requirement propagation are complete.
 
 Deliverables:
 
@@ -112,37 +114,42 @@ Deliverables:
 - scoped `EditingCore.make(options)` (complete)
 - `EditingCore.layer(options)` (complete)
 - convenience `EditingCore.create(options)` (complete)
-- `Editor.mount(core, element)`
-- `createEditor(options)`
-- `editor.view`
+- `Editor.mount(core, element)` (complete)
+- `createEditor(options)` (complete)
+- `editor.view` (complete)
 - core `state` and `schema` getters (complete)
 - synchronous `core.transact` boundary (complete)
 - immediately invalidating, idempotent `destroy(): Promise<void>` with asynchronous Scope finalization (complete)
-- `Data.TaggedError` runtime errors (complete for Editing Core)
-- service requirement propagation from extensions
+- `Data.TaggedError` runtime errors (complete for Editing Core and mount lifecycle)
+- Static Keymap View adapter (complete)
+- `Extension.Require` service requirement propagation to Effect environments (complete)
+- synchronous `layer` provisioning within the Editor Scope (complete)
 
 Validation:
 
 - runtime tests for Editing Core creation (complete)
 - runtime tests for transaction submission (complete)
 - runtime tests for destroy semantics (complete)
-- type tests for service requirements
-- runtime tests for missing services and validation errors
+- jsdom runtime tests for View/Core synchronization and mount lifecycle (complete)
+- type tests for service requirements (complete)
+- runtime tests for missing services and synchronous Layer provisioning (complete)
 
 ## Phase 6: Minimal built-in extensions
 
 Add the smallest useful built-in extension set.
 
+Status: in progress. The structural Basic extension is complete; built-in commands remain.
+
 Deliverables:
 
-- `Doc.make()`
-- `Text.make()`
-- `Paragraph.make()`
+- `Doc.make()` (complete)
+- `Text.make()` (complete)
+- `Paragraph.make()` (complete)
 - `BaseCommands.make()`
-- `Basic.make()`
+- `Basic.make()` (complete for the structural schema slice)
 
 Validation:
 
-- smoke test creating an editor with `Basic.make()`
-- smoke test inserting text through command surface or `transact`
+- smoke test creating an editor with `Basic.make()` (complete)
+- smoke test inserting text through command surface or `transact` (complete through `transact`)
 - type tests proving `Basic.make()` produces expected nodes and commands

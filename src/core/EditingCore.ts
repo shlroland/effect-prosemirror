@@ -1,10 +1,11 @@
-import { Context, Effect, Exit, Layer, Scope } from "effect"
+import { Context, Effect, Exit, Layer, Option, Scope } from "effect"
 import {
   DOMParser as ProseMirrorDOMParser,
   Node as ProseMirrorNode,
   type Schema,
 } from "prosemirror-model"
 import { EditorState, Transaction } from "prosemirror-state"
+import type { EditorView } from "prosemirror-view"
 
 import type { CommandDefinition, CommandTag } from "./Command.js"
 import * as EditorSchema from "./EditorSchema.js"
@@ -13,10 +14,15 @@ import {
   CommandNotAvailableError,
   EditorDestroyedError,
   EditorDestructionError,
+  EditorAlreadyMountedError,
+  EditorUnmountedError,
+  EditorViewSynchronizationError,
   FinalValidationError,
   InitialContentCreationError,
   InitialContentDocumentUnavailableError,
   InvalidInitialContentError,
+  MissingServiceError,
+  ServiceLayerCreationError,
   TransactionExecutionError,
   TransactionReentryError,
   type EditingCoreError,
@@ -29,6 +35,7 @@ import type {
   NamedMarkSpec,
   NamedNodeSpec,
   NodeAttrSpec,
+  ServiceTag,
   UnionSpec,
 } from "./Extension.js"
 import type { InitialContent } from "./InitialContent.js"
@@ -89,6 +96,19 @@ type KeyBindings<Spec> = Spec extends { readonly keyBindings: infer Bindings }
   : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
     ? KeyBindings<Extension.SpecOf<Extensions[number]>>
     : never
+
+type IsAny<Value> = 0 extends 1 & Value ? true : false
+
+type ServiceRequirements<Spec> =
+  IsAny<Spec> extends true
+    ? never
+    : Spec extends { readonly serviceRequirement: infer Tag }
+      ? Tag extends Context.Tag<infer Requirement, any>
+        ? Requirement
+        : never
+      : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
+        ? ServiceRequirements<Extension.SpecOf<Extensions[number]>>
+        : never
 
 type ImplementedCommandTags<Spec, Definition = CommandDefinitions<Spec>> = [Definition] extends [
   never,
@@ -162,6 +182,10 @@ export type AvailableCommandTags<ExtensionValue extends Extension.Any> = Impleme
   Extension.SpecOf<ExtensionValue>
 >
 
+export type Requirements<ExtensionValue extends Extension.Any> = ServiceRequirements<
+  Extension.SpecOf<ExtensionValue>
+>
+
 export interface CommandSurface<Available extends CommandTag.Any> {
   readonly run: <Tag extends Available>(tag: Tag, ...args: CommandTag.Args<Tag>) => boolean
   readonly canRun: <Tag extends Available>(tag: Tag, ...args: CommandTag.Args<Tag>) => boolean
@@ -175,6 +199,27 @@ export interface TransactionContext {
 }
 
 export type Transact = (callback: (context: TransactionContext) => Transaction | false) => boolean
+
+export interface MountedTransactionContext extends TransactionContext {
+  readonly view: EditorView
+}
+
+export interface ViewBindingOptions {
+  readonly getView: () => EditorView | undefined
+  readonly updateState: (state: EditorState) => void
+  readonly destroyView: () => void
+}
+
+export interface ViewBinding<Available extends CommandTag.Any = CommandTag.Any> {
+  readonly state: EditorState
+  readonly schema: Schema
+  readonly commands: CommandSurface<Available>
+  readonly transact: (
+    callback: (context: MountedTransactionContext) => Transaction | false,
+  ) => boolean
+  readonly dispatchTransaction: (transaction: Transaction) => void
+  readonly unmount: () => void
+}
 
 export interface Core<Available extends CommandTag.Any = CommandTag.Any> {
   readonly _tag: "EditingCore"
@@ -196,7 +241,26 @@ export interface Options<ExtensionValue extends Extension.Any = Extension.Any> {
 type ValidatedOptions<ExtensionValue extends Extension.Any> = Options<ExtensionValue> &
   FinalValidation<ExtensionValue>
 
+type SynchronousServiceLayer<Requirement> = [Requirement] extends [never]
+  ? { readonly layer?: undefined }
+  : { readonly layer: Layer.Layer<Requirement, unknown, never> }
+
+export type CreateOptions<ExtensionValue extends Extension.Any> = ValidatedOptions<ExtensionValue> &
+  SynchronousServiceLayer<Requirements<ExtensionValue>>
+
 export type CreationError = EditingCoreError | EditorSchema.EditorSchemaError
+
+const ViewBindingTypeId = Symbol("effect-prosemirror/EditingCore/ViewBinding")
+
+interface ViewBindableCore<Available extends CommandTag.Any> extends Core<Available> {
+  readonly [ViewBindingTypeId]: (options: ViewBindingOptions) => ViewBinding<Available>
+}
+
+/** @internal */
+export const bindView = <Available extends CommandTag.Any>(
+  core: Core<Available>,
+  options: ViewBindingOptions,
+): ViewBinding<Available> => (core as ViewBindableCore<Available>)[ViewBindingTypeId](options)
 
 const priorityRank: Record<PriorityValue, number> = {
   [Priority.Lowest]: 0,
@@ -235,6 +299,39 @@ const collectDefinitions = (extension: Extension.Any): readonly IndexedDefinitio
     return priorityDifference === 0 ? left.index - right.index : priorityDifference
   })
 }
+
+const isServiceRequirementContribution = (
+  contribution: Contribution,
+): contribution is Contribution<"service.requirement", ServiceTag> =>
+  contribution.type === "service.requirement"
+
+const collectServiceRequirements = (extension: Extension.Any): readonly ServiceTag[] => {
+  const requirements = new Map<string, ServiceTag>()
+
+  for (const contribution of extension.contributions) {
+    if (!isServiceRequirementContribution(contribution)) continue
+    requirements.set(contribution.payload.key, contribution.payload)
+  }
+
+  return [...requirements.values()]
+}
+
+const missingServices = (
+  requirements: readonly ServiceTag[],
+  context: Context.Context<any>,
+): readonly string[] =>
+  requirements.flatMap((tag) => (Option.isNone(Context.getOption(tag)(context)) ? [tag.key] : []))
+
+const validateServiceRequirements = <Requirement>(
+  requirements: readonly ServiceTag[],
+): Effect.Effect<void, MissingServiceError, Requirement> =>
+  Effect.contextWith<Requirement, readonly string[]>((context) =>
+    missingServices(requirements, context),
+  ).pipe(
+    Effect.flatMap((services) =>
+      services.length === 0 ? Effect.void : Effect.fail(new MissingServiceError({ services })),
+    ),
+  )
 
 const collectRuntimeDiagnostics = (
   extension: Extension.Any,
@@ -361,9 +458,13 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
   readonly _tag = "EditingCore"
   readonly commands: CommandSurface<Available>
 
+  readonly [ViewBindingTypeId] = (options: ViewBindingOptions): ViewBinding<Available> =>
+    this.createViewBinding(options)
+
   private destroyed = false
   private writing = false
   private destroyPromise: Promise<void> | undefined
+  private viewBinding: ViewBindingOptions | undefined
 
   constructor(
     private readonly scope: Scope.CloseableScope,
@@ -389,7 +490,46 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     return this.editorSchema
   }
 
-  readonly transact: Transact = (callback) => {
+  readonly transact: Transact = (callback) => this.transactWithView(callback)
+
+  destroy(): Promise<void> {
+    if (this.destroyPromise) return this.destroyPromise
+
+    this.destroyed = true
+    let viewDestructionError: { readonly cause: unknown } | undefined
+    try {
+      this.releaseView(this.viewBinding, true)
+    } catch (cause) {
+      viewDestructionError = { cause }
+    }
+
+    this.destroyPromise = Effect.runPromise(Scope.close(this.scope, Exit.void)).then(
+      () => {
+        if (viewDestructionError) throw new EditorDestructionError(viewDestructionError)
+      },
+      (cause) => {
+        throw new EditorDestructionError({ cause })
+      },
+    )
+    return this.destroyPromise
+  }
+
+  private transactWithView(
+    callback: (context: TransactionContext) => Transaction | false,
+    view?: undefined,
+  ): boolean
+
+  private transactWithView(
+    callback: (context: MountedTransactionContext) => Transaction | false,
+    view: EditorView,
+  ): boolean
+
+  private transactWithView(
+    callback:
+      | ((context: TransactionContext) => Transaction | false)
+      | ((context: MountedTransactionContext) => Transaction | false),
+    view?: EditorView,
+  ): boolean {
     if (this.destroyed) return false
     if (this.writing) throw new TransactionReentryError()
 
@@ -397,11 +537,17 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     try {
       let transaction: Transaction | false
       try {
-        transaction = callback({
+        const context: TransactionContext = {
           state: this.editorState,
           schema: this.editorSchema,
           tr: this.editorState.tr,
-        })
+        }
+        transaction = view
+          ? (callback as (context: MountedTransactionContext) => Transaction | false)({
+              ...context,
+              view,
+            })
+          : (callback as (context: TransactionContext) => Transaction | false)(context)
       } catch (cause) {
         if (cause instanceof TransactionReentryError) throw cause
         throw new TransactionExecutionError({ phase: "callback", cause })
@@ -418,22 +564,17 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
       try {
         return this.applyTransaction(transaction)
       } catch (cause) {
-        if (cause instanceof TransactionExecutionError) throw cause
+        if (
+          cause instanceof TransactionExecutionError ||
+          cause instanceof EditorViewSynchronizationError
+        ) {
+          throw cause
+        }
         throw new TransactionExecutionError({ phase: "apply", cause })
       }
     } finally {
       this.writing = false
     }
-  }
-
-  destroy(): Promise<void> {
-    if (this.destroyPromise) return this.destroyPromise
-
-    this.destroyed = true
-    this.destroyPromise = Effect.runPromise(Scope.close(this.scope, Exit.void)).catch((cause) => {
-      throw new EditorDestructionError({ cause })
-    })
-    return this.destroyPromise
   }
 
   private assertLive(): void {
@@ -446,7 +587,7 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     return definitions
   }
 
-  private run(tag: CommandTag.Any, args: readonly unknown[]): boolean {
+  private run(tag: CommandTag.Any, args: readonly unknown[], view?: EditorView): boolean {
     if (this.destroyed) return false
     if (this.writing) throw new TransactionReentryError()
 
@@ -458,9 +599,14 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
       for (const definition of definitions) {
         try {
           const command = definition.run(...args)
-          if (command(state, (transaction) => this.applyTransaction(transaction))) return true
+          if (command(state, (transaction) => this.applyTransaction(transaction), view)) return true
         } catch (cause) {
-          if (cause instanceof TransactionReentryError) throw cause
+          if (
+            cause instanceof TransactionReentryError ||
+            cause instanceof EditorViewSynchronizationError
+          ) {
+            throw cause
+          }
           throw new CommandExecutionError({
             command: tag.commandName,
             operation: "run",
@@ -474,12 +620,12 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     }
   }
 
-  private canRun(tag: CommandTag.Any, args: readonly unknown[]): boolean {
+  private canRun(tag: CommandTag.Any, args: readonly unknown[], view?: EditorView): boolean {
     if (this.destroyed) return false
 
     for (const definition of this.definitionsFor(tag)) {
       try {
-        if (definition.run(...args)(this.editorState)) return true
+        if (definition.run(...args)(this.editorState, undefined, view)) return true
       } catch (cause) {
         throw new CommandExecutionError({
           command: tag.commandName,
@@ -513,7 +659,73 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     const result = this.editorState.applyTransaction(transaction)
     if (result.transactions.length === 0) return false
     this.editorState = result.state
+
+    const binding = this.viewBinding
+    if (binding) {
+      try {
+        binding.updateState(result.state)
+      } catch (cause) {
+        try {
+          this.releaseView(binding, true)
+        } catch {
+          // Synchronization is already unrecoverable; retain its root cause.
+        }
+        throw new EditorViewSynchronizationError({ cause })
+      }
+    }
+
     return true
+  }
+
+  private createViewBinding(options: ViewBindingOptions): ViewBinding<Available> {
+    this.assertLive()
+    if (this.viewBinding) throw new EditorAlreadyMountedError()
+
+    this.viewBinding = options
+    const coreState = (): EditorState => this.state
+    const coreSchema = (): Schema => this.schema
+
+    const view = (): EditorView => {
+      const current = options.getView()
+      if (!current) throw new EditorUnmountedError()
+      return current
+    }
+
+    return {
+      get state() {
+        return coreState()
+      },
+      get schema() {
+        return coreSchema()
+      },
+      commands: {
+        run: (tag, ...args) => this.run(tag, args, view()),
+        canRun: (tag, ...args) => this.canRun(tag, args, view()),
+        isActive: (tag, ...args) => this.isActive(tag, args),
+      },
+      transact: (callback) => this.transactWithView(callback, view()),
+      dispatchTransaction: (transaction) => {
+        if (this.destroyed) return
+        if (this.writing) throw new TransactionReentryError()
+
+        this.writing = true
+        try {
+          this.applyTransaction(transaction)
+        } catch (cause) {
+          if (cause instanceof EditorViewSynchronizationError) throw cause
+          throw new TransactionExecutionError({ phase: "apply", cause })
+        } finally {
+          this.writing = false
+        }
+      },
+      unmount: () => this.releaseView(options, true),
+    }
+  }
+
+  private releaseView(options: ViewBindingOptions | undefined, destroy: boolean): void {
+    if (!options || this.viewBinding !== options) return
+    this.viewBinding = undefined
+    if (destroy) options.destroyView()
   }
 }
 
@@ -536,25 +748,55 @@ const buildCore = (options: Options, scope: Scope.CloseableScope): Any => {
   return new CoreImpl(scope, buildRegistry(definitions), schema, state, keymap)
 }
 
+const buildSynchronousServiceContext = (
+  extension: Extension.Any,
+  scope: Scope.CloseableScope,
+  layer: Layer.Layer<any, unknown, never> | undefined,
+): void => {
+  let context: Context.Context<never> | undefined
+
+  try {
+    context = layer
+      ? (Effect.runSync(Layer.buildWithScope(layer, scope)) as unknown as Context.Context<never>)
+      : Context.empty()
+  } catch (cause) {
+    throw new ServiceLayerCreationError({ cause })
+  }
+
+  const services = missingServices(
+    collectServiceRequirements(extension),
+    context as unknown as Context.Context<any>,
+  )
+  if (services.length > 0) throw new MissingServiceError({ services })
+}
+
 export class EditingCore extends Context.Tag("effect-prosemirror/EditingCore")<EditingCore, Any>() {
   static make<const ExtensionValue extends Extension.Any>(
     options: ValidatedOptions<ExtensionValue>,
-  ): Effect.Effect<Core<AvailableCommandTags<ExtensionValue>>, CreationError, Scope.Scope> {
+  ): Effect.Effect<
+    Core<AvailableCommandTags<ExtensionValue>>,
+    CreationError,
+    Requirements<ExtensionValue> | Scope.Scope
+  > {
     return (make as Function)(options) as Effect.Effect<
       Core<AvailableCommandTags<ExtensionValue>>,
       CreationError,
-      Scope.Scope
+      Requirements<ExtensionValue> | Scope.Scope
     >
   }
 
   static layer<const ExtensionValue extends Extension.Any>(
     options: ValidatedOptions<ExtensionValue>,
-  ): Layer.Layer<EditingCore, CreationError> {
-    return (layer as Function)(options) as Layer.Layer<EditingCore, CreationError>
+  ): Layer.Layer<EditingCore, CreationError, Requirements<ExtensionValue>> {
+    return (layer as Function)(options) as Layer.Layer<
+      EditingCore,
+      CreationError,
+      Requirements<ExtensionValue>
+    >
   }
 
   static create<const ExtensionValue extends Extension.Any>(
-    options: ValidatedOptions<ExtensionValue>,
+    options: CreateOptions<ExtensionValue>,
   ): Core<AvailableCommandTags<ExtensionValue>> {
     return (create as Function)(options) as Core<AvailableCommandTags<ExtensionValue>>
   }
@@ -562,13 +804,24 @@ export class EditingCore extends Context.Tag("effect-prosemirror/EditingCore")<E
 
 export const make = <const ExtensionValue extends Extension.Any>(
   options: ValidatedOptions<ExtensionValue>,
-): Effect.Effect<Core<AvailableCommandTags<ExtensionValue>>, CreationError, Scope.Scope> =>
+): Effect.Effect<
+  Core<AvailableCommandTags<ExtensionValue>>,
+  CreationError,
+  Requirements<ExtensionValue> | Scope.Scope
+> =>
   Effect.gen(function* () {
     const scope = yield* Scope.make()
-    const core = yield* Effect.try({
-      try: () => buildCore(options, scope),
-      catch: (error) => error as CreationError,
-    }).pipe(Effect.tapError(() => Scope.close(scope, Exit.void)))
+    const core = yield* validateServiceRequirements<Requirements<ExtensionValue>>(
+      collectServiceRequirements(options.extension),
+    ).pipe(
+      Effect.zipRight(
+        Effect.try({
+          try: () => buildCore(options, scope),
+          catch: (error) => error as CreationError,
+        }),
+      ),
+      Effect.tapError(() => Scope.close(scope, Exit.void)),
+    )
 
     yield* Effect.addFinalizer(() => Effect.promise(() => core.destroy()))
     return core as Core<AvailableCommandTags<ExtensionValue>>
@@ -576,17 +829,22 @@ export const make = <const ExtensionValue extends Extension.Any>(
 
 export const layer = <const ExtensionValue extends Extension.Any>(
   options: ValidatedOptions<ExtensionValue>,
-): Layer.Layer<EditingCore, CreationError> =>
+): Layer.Layer<EditingCore, CreationError, Requirements<ExtensionValue>> =>
   Layer.scoped(
     EditingCore,
     (make as Function)(options) as Effect.Effect<Any, CreationError, Scope.Scope>,
   )
 
 export const create = <const ExtensionValue extends Extension.Any>(
-  options: ValidatedOptions<ExtensionValue>,
+  options: CreateOptions<ExtensionValue>,
 ): Core<AvailableCommandTags<ExtensionValue>> => {
   const scope = Effect.runSync(Scope.make())
   try {
+    buildSynchronousServiceContext(
+      options.extension,
+      scope,
+      "layer" in options ? options.layer : undefined,
+    )
     return buildCore(options, scope) as Core<AvailableCommandTags<ExtensionValue>>
   } catch (error) {
     void Effect.runPromise(Scope.close(scope, Exit.void))

@@ -80,10 +80,10 @@ The first built-in extensions should be minimal and exist to validate the core m
 `Basic.make()` follows a minimal-usable principle:
 
 ```ts
-Basic.make() = Extension.union(Doc.make(), Text.make(), Paragraph.make(), BaseCommands.make())
+Basic.make() = Extension.union(Doc.make(), Text.make(), Paragraph.make())
 ```
 
-It should not include history, keymaps, marks, lists, tables, drop cursor, or gap cursor in the first phase.
+`BaseCommands.make()` will be composed into `Basic.make()` only once the separately designed built-in command set exists. Neither slice includes history, keymaps, marks, lists, tables, drop cursor, or gap cursor.
 
 ## Extension Contributions
 
@@ -313,7 +313,7 @@ core.commands.isActive(SetTextColor, { color: "red" })
 
 `canRun` is derived by running the command without dispatch. `isActive` is also synchronous and reads the current editor state. The first phase should support `isActive` on `Command.define`, while keeping it optional.
 
-Command Definitions retain ProseMirror's original `(state, dispatch?, view?) => boolean` command signature. `EditingCore.commands` supplies the current state and dispatch but leaves the optional `view` argument `undefined`. A future mounted `Editor.commands` facade and `prosemirror-keymap` execution supply the real `EditorView`. A view-dependent command may therefore return `false` when invoked on an unmounted Editing Core and succeed when invoked through a mounted Editor Instance. The core never creates, stores, or fakes an `EditorView` to change this behavior.
+Command Definitions retain ProseMirror's original `(state, dispatch?, view?) => boolean` command signature. `EditingCore.commands` supplies the current state and dispatch but leaves the optional `view` argument `undefined`. Mounted `Editor.commands` and installed `prosemirror-keymap` bindings supply the real `EditorView`. A view-dependent command may therefore return `false` when invoked on an unmounted Editing Core and succeed when invoked through a mounted Editor Instance. The core never creates, stores, or fakes an `EditorView` to change this behavior.
 
 When `isActive` is provided, its user-facing parameters must match the Command Tag. If `isActive` is omitted, the command surface still exposes `.isActive(...)`, which returns `false`.
 
@@ -342,7 +342,7 @@ const chord = KeyChord.make({
 
 Key modifiers form an unordered set containing only `Modifier.Mod`, `Modifier.Ctrl`, `Modifier.Alt`, `Modifier.Shift`, and `Modifier.Meta`. `KeyChord.make` normalizes them into a stable order and removes duplicates, so `[Modifier.Mod, Modifier.Alt]` and `[Modifier.Alt, Modifier.Mod]` have the same chord identity. Aliases such as `Cmd` and `Control` are not part of the public model.
 
-`Mod` remains platform-abstract in the Static Keymap and Editing Core. The future View adapter must not implement its own platform detection or key-event matching. It preserves binding-chain precedence while delegating platform-specific `Mod` resolution, shifted-character handling, key normalization, and keyboard event matching to `prosemirror-keymap`. If abstract chords overlap on a particular platform, normal ProseMirror keymap precedence and `false` fallthrough determine which binding handles the event.
+`Mod` remains platform-abstract in the Static Keymap and Editing Core. `Editor.mount` compiles each chord's ordered binding chain into one `prosemirror-keymap` command and installs the resulting plugin as a View direct plugin. The adapter does not implement its own platform detection or key-event matching: `prosemirror-keymap` resolves `Mod`, shifted characters, normalized key names, and keyboard events. If abstract chords overlap on a particular platform, normal ProseMirror keymap precedence and `false` fallthrough determine which binding handles the event. Destroying the View removes this direct plugin with the rest of the View lifecycle.
 
 A Command Invocation captures an immutable, complete argument tuple when the Static Keymap is constructed:
 
@@ -372,7 +372,7 @@ Extensions can declare Service Requirements:
 Extension.Require(AiClient)
 ```
 
-The application provides implementations when creating the editor:
+The application provides implementations when synchronously creating the editor:
 
 ```ts
 createEditor({
@@ -383,7 +383,7 @@ createEditor({
 
 The first phase does not allow arbitrary business Layers to be embedded inside extensions.
 
-`EditingCore.layer` exposes extension requirements in its environment type. If an extension requires `AiClient`, then the core layer still requires `AiClient`:
+`EditingCore.make` and `EditingCore.layer` expose extension requirements in their environment types. If an extension requires `AiClient`, then the core layer still requires `AiClient`:
 
 ```ts
 EditingCore.layer({ extension })
@@ -396,7 +396,7 @@ The application satisfies those requirements by providing Layers around the edit
 Effect.provide(program, Layer.mergeAll(AiClientLive, EditingCore.layer({ extension })))
 ```
 
-Editing Core construction performs Final Validation against the provided requirements. The mounted `createEditor` convenience constructor inherits that validation. Missing service implementations produce Typed Diagnostics.
+Effect-native construction validates each declared service against its supplied Context and fails with `MissingServiceError { services }` when one is absent. `EditingCore.create` and `createEditor` instead require a no-input `layer` that provides every declared service. That Layer is built into the Editor Scope, so its resources are released with `destroy()`. Synchronous construction cannot await Layer acquisition: a failing or asynchronous Layer produces `ServiceLayerCreationError { cause }`; applications needing asynchronous provisioning use `EditingCore.make` or `EditingCore.layer`.
 
 In the MVP, `Extension.Require(Tag)` is explicit because schema, command, and keymap contributions do not run Effect programs directly. Future `Extension.Actions` and `Extension.Plugin` APIs should automatically accumulate requirements from their Effect environment types, while `Extension.Require` remains available for explicit external contracts.
 
@@ -443,7 +443,7 @@ If `Editor.mount(core, element)` fails during EditorView or plugin View initiali
 
 `createEditor` owns the core it creates, so its construction is transactional across core creation and mount. If mounting fails after `EditingCore.create` succeeds, it calls `core.destroy()` before rethrowing the original `EditorMountError`. The core and View become invalid synchronously while Scope finalizers continue through the destroy Promise. The synchronous constructor does not await cleanup; it observes cleanup rejection through the Effect runtime without replacing the mount failure.
 
-`editor.unmount()` is idempotent. It destroys the active EditorView and removes state synchronization but leaves the Editing Core, its current state, and its Editor Scope alive. The core may then be mounted to another element. `core.destroy()` is the irreversible boundary: it synchronously marks the core destroyed, automatically unmounts any active View, prevents every future mount, and returns a shared `Promise<void>` that completes after the Editor Scope's potentially asynchronous finalizers finish.
+`editor.unmount()` is idempotent. It destroys the active EditorView and removes state synchronization but leaves the Editing Core, its current state, and its Editor Scope alive. The core may then be mounted to another element. A View destruction exception is reported as `EditorUnmountError { cause }` only after the handle has been detached. `core.destroy()` is the irreversible boundary: it synchronously marks the core destroyed, automatically unmounts any active View, prevents every future mount, and returns a shared `Promise<void>` that completes after the Editor Scope's potentially asynchronous finalizers finish. A View destruction exception during core destruction rejects that Promise as `EditorDestructionError { cause }` rather than escaping synchronously.
 
 Every Editor Instance, whether returned by `Editor.mount` or `createEditor`, exposes both `unmount()` and `destroy()`. `editor.destroy()` delegates to the same irreversible lifecycle transition as `core.destroy()`, while `editor.unmount()` remains View-only. The API does not infer cleanup ownership from which constructor produced the instance.
 
@@ -590,7 +590,7 @@ type ExtensionSpec = {
 
 `Extension.union` preserves raw contributions and local ordering without rejecting Forward References. At complete-core runtime Final Validation, definitions referencing the same Command Tag form a command chain, while distinct runtime Tags with the same public name produce a `DuplicateCommandName` diagnostic.
 
-Completeness checks are deferred to `EditingCore.create`, `EditingCore.make`, and `EditingCore.layer`. These include missing node specs for node attrs, missing mark specs for mark attrs, missing Command Tag implementations for keymaps, incomplete schema requirements, and missing service implementations.
+Completeness checks are deferred to `EditingCore.create`, `EditingCore.make`, and `EditingCore.layer`. These include missing node specs for node attrs, missing mark specs for mark attrs, and missing Command Tag implementations for keymaps. Declared services are validated against the construction Context or synchronous Layer at the same boundary.
 
 Typed Diagnostics should carry readable details:
 

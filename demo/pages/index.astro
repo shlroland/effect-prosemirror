@@ -1,0 +1,24 @@
+---
+import BasicEditor from "../components/basic-editor.astro"
+import "../styles/demo.css"
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Effect ProseMirror Demo</title>
+  </head>
+  <body>
+    <main class="demo-shell">
+      <header class="demo-shell__header">
+        <div>
+          <p class="demo-shell__eyebrow">Effect ProseMirror</p>
+          <h1>Runtime demo</h1>
+        </div>
+        <a href="/playground">Open Astrobook</a>
+      </header>
+      <BasicEditor initialText="This editor is mounted by createEditor." />
+    </main>
+  </body>
+</html>

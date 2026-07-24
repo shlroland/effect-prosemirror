@@ -1,3 +1,4 @@
+import { Context } from "effect"
 import * as EffectSchema from "effect/Schema"
 import { pipeArguments, type Pipeable } from "effect/Pipeable"
 import type {
@@ -88,6 +89,7 @@ export type AttrOptions<Type extends string = string, Attr extends string = stri
 
 export type CommandDefinitions = readonly CommandDefinition[]
 export type KeyBindings = readonly KeyBinding[]
+export type ServiceTag = Context.Tag<any, any>
 
 class ExtensionImpl<Spec> implements Extension<Spec> {
   readonly _tag = "Extension"
@@ -225,6 +227,15 @@ export const Keymap = <const Bindings extends KeyBindings>(
 }> =>
   make({ keyBindings: bindings }, [
     { type: "keymap.bindings", payload: bindings, priority: Default },
+  ])
+
+export const Require = <const Tag extends ServiceTag>(
+  tag: Tag,
+): Extension<{
+  readonly serviceRequirement: Tag
+}> =>
+  make({ serviceRequirement: tag }, [
+    { type: "service.requirement", payload: tag, priority: Default },
   ])
 
 export const priority =

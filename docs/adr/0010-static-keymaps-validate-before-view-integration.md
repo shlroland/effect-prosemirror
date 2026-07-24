@@ -1,5 +1,7 @@
 # Static Keymaps Validate Before View Integration
 
+Status: Superseded by [ADR 0011](./0011-static-keymaps-use-prosemirror-keymap-at-mount.md).
+
 Static Keymaps are modeled and Final Validated with Commands, but do not install keyboard listeners in the Editing Core. Actual key event handling is deferred to the future `EditorView` adapter, keeping DOM focus and ProseMirror plugin lifecycle outside the synchronous command runtime.
 
 Public key bindings use structured Key Chords rather than raw ProseMirror key-name strings. Each binding contains a Command Invocation whose complete, immutable arguments are captured when the Static Keymap is constructed. A Command Invocation accepts a Command Tag, not a bare command-name string, so its argument tuple is checked immediately without depending on a concrete implementation. Final Validation separately ensures that the composed Extension Union provides an implementation for the referenced Tag. Runtime-computed command arguments are passed directly through the Command Surface instead of being deferred inside a Static Keymap.

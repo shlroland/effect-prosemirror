@@ -69,7 +69,7 @@ The lifecycle invariant that one Editing Core owns at most one active EditorView
 _Avoid_: Shared core across active views, multi-view editor
 
 **Editor Unmount**:
-The idempotent operation that destroys the active EditorView and detaches mounted state synchronization without destroying the Editing Core or its Editor Scope. A live core may be mounted again with its current state.
+The idempotent operation that destroys the active EditorView and detaches mounted state synchronization without destroying the Editing Core or its Editor Scope. A live core may be mounted again with its current state. A View destruction exception becomes `EditorUnmountError { cause }` after detachment.
 _Avoid_: Core destroy, editor reset
 
 **Stale Editor Handle**:
@@ -117,8 +117,12 @@ A normal ProseMirror plugin whose side effects, background work, and external de
 _Avoid_: Effect plugin, async plugin
 
 **Service Requirement**:
-An Extension Contribution that declares an Effect service needed by an extension without providing the business implementation.
+An Extension Contribution that declares an Effect service needed by an extension without providing the business implementation. Effect-native construction requires it in the environment; synchronous construction receives a Layer that provides it for the Editor Scope.
 _Avoid_: Embedded business layer, hidden dependency
+
+**Synchronous Service Layer**:
+A no-input Layer supplied to `EditingCore.create` or `createEditor` that provides every Service Requirement and shares the Editor Scope. A Layer that fails or requires asynchronous acquisition is reported as `ServiceLayerCreationError` because synchronous construction cannot await it.
+_Avoid_: Unscoped service, hidden async initialization
 
 **Extension**:
 The primary authoring unit for composing editor capabilities as independent contributions such as node specs, mark specs, commands, plugins, and Effect-managed services.
@@ -193,7 +197,7 @@ A canonical member of the unordered modifier set on a Key Chord: `Mod`, `Ctrl`, 
 _Avoid_: Cmd alias, Control alias, ordered modifier list
 
 **Keymap Compilation**:
-The future Editor View adapter operation that preserves the ordered Static Keymap binding chains while delegating platform-specific `Mod` resolution, key normalization, and keyboard event matching to `prosemirror-keymap`.
+The mounted Editor View adapter operation that preserves the ordered Static Keymap binding chains while delegating platform-specific `Mod` resolution, key normalization, and keyboard event matching to `prosemirror-keymap`. It is a View-owned direct plugin and does not enter the Editing Core's state plugin collection.
 _Avoid_: Custom platform detection, reimplemented ProseMirror key matching
 
 **Command Invocation**:

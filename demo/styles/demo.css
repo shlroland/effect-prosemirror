@@ -1,0 +1,146 @@
+:root {
+  color: #1d1b20;
+  background: #f6f5f1;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+.demo-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.demo-shell__header,
+.effect-editor-demo__header,
+.effect-editor-demo__inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.demo-shell__header {
+  margin-bottom: 28px;
+}
+
+.demo-shell__eyebrow,
+.effect-editor-demo__eyebrow {
+  margin: 0 0 5px;
+  color: #446f61;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.demo-shell h1,
+.effect-editor-demo h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.demo-shell__header a,
+.effect-editor-demo__action {
+  border: 1px solid #1d1b20;
+  border-radius: 6px;
+  background: #1d1b20;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 9px 13px;
+  text-decoration: none;
+}
+
+.effect-editor-demo {
+  border: 1px solid #d5d1c7;
+  background: #ffffff;
+}
+
+.effect-editor-demo__header {
+  min-height: 72px;
+  border-bottom: 1px solid #d5d1c7;
+  padding: 14px 18px;
+}
+
+.effect-editor-demo__workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr);
+  min-height: 440px;
+}
+
+.effect-editor-demo__canvas {
+  min-width: 0;
+  padding: 28px;
+}
+
+.effect-editor-demo__canvas .ProseMirror {
+  min-height: 360px;
+  outline: none;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.effect-editor-demo__canvas .ProseMirror p {
+  margin: 0 0 12px;
+}
+
+.effect-editor-demo__inspector {
+  border-left: 1px solid #d5d1c7;
+  background: #f0f5ec;
+  padding: 16px;
+}
+
+.effect-editor-demo__inspector-header {
+  color: #3c4a42;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.effect-editor-demo__refresh {
+  border: 0;
+  background: transparent;
+  color: #446f61;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.effect-editor-demo__inspector pre {
+  overflow: auto;
+  margin: 14px 0 0;
+  color: #29322d;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 720px) {
+  .demo-shell {
+    width: min(100% - 24px, 1180px);
+    padding-top: 20px;
+  }
+
+  .effect-editor-demo__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .effect-editor-demo__inspector {
+    min-height: 180px;
+    border-top: 1px solid #d5d1c7;
+    border-left: 0;
+  }
+}

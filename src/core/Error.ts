@@ -46,6 +46,14 @@ export class InitialContentCreationError extends Data.TaggedError("InitialConten
   readonly reason: "TopNodeCannotCreateAndFill"
 }> {}
 
+export class MissingServiceError extends Data.TaggedError("MissingServiceError")<{
+  readonly services: readonly string[]
+}> {}
+
+export class ServiceLayerCreationError extends Data.TaggedError("ServiceLayerCreationError")<{
+  readonly cause: unknown
+}> {}
+
 export class InvalidKeyError extends Data.TaggedError("InvalidKeyError")<{
   readonly value: unknown
   readonly reason: "NotSinglePrintableCharacter" | "InvalidFunctionKey"
@@ -70,6 +78,24 @@ export class TransactionExecutionError extends Data.TaggedError("TransactionExec
 
 export class EditorDestroyedError extends Data.TaggedError("EditorDestroyedError")<{}> {}
 
+export class EditorAlreadyMountedError extends Data.TaggedError("EditorAlreadyMountedError")<{}> {}
+
+export class EditorUnmountedError extends Data.TaggedError("EditorUnmountedError")<{}> {}
+
+export class EditorUnmountError extends Data.TaggedError("EditorUnmountError")<{
+  readonly cause: unknown
+}> {}
+
+export class EditorMountError extends Data.TaggedError("EditorMountError")<{
+  readonly cause: unknown
+}> {}
+
+export class EditorViewSynchronizationError extends Data.TaggedError(
+  "EditorViewSynchronizationError",
+)<{
+  readonly cause: unknown
+}> {}
+
 export class EditorDestructionError extends Data.TaggedError("EditorDestructionError")<{
   readonly cause: unknown
 }> {}
@@ -79,12 +105,19 @@ export type EditingCoreError =
   | InitialContentDocumentUnavailableError
   | InvalidInitialContentError
   | InitialContentCreationError
+  | MissingServiceError
+  | ServiceLayerCreationError
   | InvalidKeyError
   | CommandNotAvailableError
   | CommandExecutionError
   | TransactionReentryError
   | TransactionExecutionError
   | EditorDestroyedError
+  | EditorAlreadyMountedError
+  | EditorUnmountedError
+  | EditorUnmountError
+  | EditorMountError
+  | EditorViewSynchronizationError
   | EditorDestructionError
 
 export type EditorError = EditingCoreError

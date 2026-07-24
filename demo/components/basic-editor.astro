@@ -1,0 +1,71 @@
+---
+interface Props {
+  readonly initialText?: string
+}
+
+const { initialText = "Start typing in the editor." } = Astro.props
+---
+
+<section class="effect-editor-demo" data-effect-editor-demo data-initial-text={initialText}>
+  <header class="effect-editor-demo__header">
+    <div>
+      <p class="effect-editor-demo__eyebrow">Basic.make()</p>
+      <h2>Editing Core</h2>
+    </div>
+    <button class="effect-editor-demo__action" type="button" data-insert-sample>
+      Insert sample
+    </button>
+  </header>
+
+  <div class="effect-editor-demo__workspace">
+    <div class="effect-editor-demo__canvas" data-editor-canvas></div>
+    <aside class="effect-editor-demo__inspector" aria-label="Document JSON">
+      <div class="effect-editor-demo__inspector-header">
+        <span>Document JSON</span>
+        <button class="effect-editor-demo__refresh" type="button" data-refresh-json>Refresh</button>
+      </div>
+      <pre data-document-json></pre>
+    </aside>
+  </div>
+</section>
+
+<script>
+  import { Basic, createEditor, InitialContent } from "effect-prosemirror"
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-effect-editor-demo]")) {
+    const canvas = root.querySelector<HTMLElement>("[data-editor-canvas]")
+    const output = root.querySelector<HTMLElement>("[data-document-json]")
+    const insertSample = root.querySelector<HTMLButtonElement>("[data-insert-sample]")
+    const refreshButton = root.querySelector<HTMLButtonElement>("[data-refresh-json]")
+
+    if (!canvas || !output || !insertSample || !refreshButton) continue
+
+    const editor = createEditor({
+      extension: Basic.make(),
+      element: canvas,
+      initialContent: InitialContent.JSON({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: root.dataset.initialText ?? "" }],
+          },
+        ],
+      }),
+    })
+
+    const refresh = () => {
+      output.textContent = JSON.stringify(editor.state.doc.toJSON(), null, 2)
+    }
+
+    insertSample.addEventListener("click", () => {
+      editor.view.focus()
+      editor.transact(({ tr }) => tr.insertText(" Effect"))
+      refresh()
+    })
+    refreshButton.addEventListener("click", refresh)
+    root.addEventListener("input", refresh)
+    root.addEventListener("keydown", () => requestAnimationFrame(refresh))
+    refresh()
+  }
+</script>

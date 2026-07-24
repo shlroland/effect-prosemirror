@@ -12,6 +12,8 @@ Failures raised by available Command Definitions are reported uniformly as `Comm
 
 Operations attempted through an unmounted Editor Instance fail with `EditorUnmountedError`. The stale handle never silently falls back to core-only execution or retargets a later mount.
 
+An exception while destroying a View during an explicit `editor.unmount()` is reported as `EditorUnmountError { cause }`. Core destruction reports the same class of failure through its asynchronous `EditorDestructionError { cause }` completion instead of throwing synchronously.
+
 A mounted View that cannot reflect an accepted core state is detached and reported through `EditorViewSynchronizationError { cause }`; raw plugin or DOM exceptions do not cross the adapter boundary.
 
 EditorView or plugin View initialization failures are reported as `EditorMountError { cause }` after partial mount cleanup. `EditorDestroyedError` and `EditorAlreadyMountedError` remain distinct lifecycle failures.

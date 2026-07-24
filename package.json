@@ -65,11 +65,30 @@
     "./core/EditorSchema": {
       "types": "./dist/core/EditorSchema.d.ts",
       "default": "./dist/core/EditorSchema.js"
+    },
+    "./extensions/basic": {
+      "types": "./dist/extensions/basic.d.ts",
+      "default": "./dist/extensions/basic.js"
+    },
+    "./extensions/doc": {
+      "types": "./dist/extensions/doc.d.ts",
+      "default": "./dist/extensions/doc.js"
+    },
+    "./extensions/paragraph": {
+      "types": "./dist/extensions/paragraph.d.ts",
+      "default": "./dist/extensions/paragraph.js"
+    },
+    "./extensions/text": {
+      "types": "./dist/extensions/text.d.ts",
+      "default": "./dist/extensions/text.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck",
+    "demo:build": "astro build",
+    "demo:dev": "astro dev",
+    "demo:preview": "astro preview",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "hooks:install": "mise exec -- pre-commit install --install-hooks",
@@ -81,13 +100,17 @@
   },
   "dependencies": {
     "effect": "^3.19.6",
+    "prosemirror-keymap": "^1.2.3",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",
     "prosemirror-view": "^1.41.3"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "astro": "^6.4.8",
+    "astrobook": "^0.13.2",
     "expect-type": "^1.2.2",
+    "jsdom": "^29.1.1",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.73.0",
     "typescript": "^5.9.3",
