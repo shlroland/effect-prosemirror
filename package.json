@@ -22,6 +22,10 @@
       "types": "./dist/extensions/basic.d.ts",
       "default": "./dist/extensions/basic.js"
     },
+    "./extensions/base-commands": {
+      "types": "./dist/extensions/base-commands.d.ts",
+      "default": "./dist/extensions/base-commands.js"
+    },
     "./extensions/doc": {
       "types": "./dist/extensions/doc.d.ts",
       "default": "./dist/extensions/doc.js"
@@ -55,6 +59,7 @@
     "prosemirror-keymap": "^1.2.3",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",
+    "prosemirror-transform": "^1.12.0",
     "prosemirror-view": "^1.41.3"
   },
   "devDependencies": {

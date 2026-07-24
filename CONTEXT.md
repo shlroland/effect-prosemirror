@@ -216,6 +216,14 @@ _Avoid_: Command name string, untyped registry key
 A synchronous implementation of a Command Tag, including its required `run` creator and optional `isActive` creator. Multiple Definitions for the same Tag participate in Command Merge.
 _Avoid_: Command contract, Command name
 
+**Base Command**:
+One of the minimal synchronous editing intents provided by `BaseCommands.make()`: inserting text, deleting a non-empty selection, selecting the complete document, or splitting the current paragraph. Base Commands are schema-aware ProseMirror operations and do not carry key bindings, history, or asynchronous behavior.
+_Avoid_: Editor action, key binding, async command
+
+**Paragraph Split**:
+The Base Command that splits the current paragraph only when the selection is an empty TextSelection and ProseMirror confirms the document can split at that position. A non-empty selection or unsplittable position returns `false`.
+_Avoid_: Split selected content, forced split, generic block split
+
 **Command Execution Context**:
 The standard ProseMirror `(state, dispatch, view?)` inputs supplied to a Command. Editing Core execution omits the optional View; a mounted Editor Command Surface and `prosemirror-keymap` supply the real `EditorView` without changing the Command Definition.
 _Avoid_: Fake EditorView, DOM reference stored by Editing Core

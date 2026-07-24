@@ -80,7 +80,7 @@ The first built-in extensions should be minimal and exist to validate the core m
 Basic.make() = Extension.union(Doc.make(), Text.make(), Paragraph.make())
 ```
 
-`BaseCommands.make()` will be composed into `Basic.make()` only once the separately designed built-in command set exists. Neither slice includes history, keymaps, marks, lists, tables, drop cursor, or gap cursor.
+`BaseCommands.make()` is composed into `Basic.make()`. It contributes four schema-aware synchronous Commands: `InsertText(text)`, `DeleteSelection()`, `SelectAll()`, and `SplitParagraph()`. `SplitParagraph()` accepts only an empty TextSelection at a ProseMirror-splittable position; it does not delete or split a selected range. Neither slice includes history, keymaps, marks, lists, tables, drop cursor, or gap cursor.
 
 ## Extension Contributions
 

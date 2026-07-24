@@ -138,18 +138,18 @@ Validation:
 
 Add the smallest useful built-in extension set.
 
-Status: in progress. The structural Basic extension is complete; built-in commands remain.
+Status: complete.
 
 Deliverables:
 
 - `Doc.make()` (complete)
 - `Text.make()` (complete)
 - `Paragraph.make()` (complete)
-- `BaseCommands.make()`
-- `Basic.make()` (complete for the structural schema slice)
+- `BaseCommands.make()` (complete: InsertText, DeleteSelection, SelectAll, and SplitParagraph)
+- `Basic.make()` (complete)
 
 Validation:
 
 - smoke test creating an editor with `Basic.make()` (complete)
-- smoke test inserting text through command surface or `transact` (complete through `transact`)
-- type tests proving `Basic.make()` produces expected nodes and commands
+- smoke test inserting text through command surface or `transact` (complete through command surface)
+- type tests proving `Basic.make()` produces expected nodes and commands (complete)

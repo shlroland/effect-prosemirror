@@ -1,5 +1,6 @@
 export * from "./core.js"
 export * as Basic from "./extensions/basic.js"
+export * as BaseCommands from "./extensions/base-commands.js"
 export * as Doc from "./extensions/doc.js"
 export * as Paragraph from "./extensions/paragraph.js"
 export * as Text from "./extensions/text.js"
