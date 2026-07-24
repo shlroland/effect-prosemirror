@@ -3,7 +3,7 @@ import type { EditorState, Transaction } from "prosemirror-state"
 import { EditorView } from "prosemirror-view"
 
 import type { CommandTag } from "./Command.js"
-import * as EditingCore from "./EditingCore.js"
+import * as EditingCore from "./editing-core/EditingCore.js"
 import {
   EditorMountError,
   EditorUnmountError,
@@ -115,5 +115,5 @@ export const mount = <Available extends CommandTag.Any>(
   }
 }
 
-export type { Diagnostic, FinalValidation } from "./EditingCore.js"
+export type { Diagnostic, FinalValidation } from "./editing-core/EditingCore.js"
 export type { EditorError }

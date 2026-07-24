@@ -1,6 +1,6 @@
 export * as Command from "./internal/Command.js"
 export * as CommandInvocation from "./internal/CommandInvocation.js"
-export * as EditingCore from "./internal/EditingCore.js"
+export * as EditingCore from "./internal/editing-core/EditingCore.js"
 export * as Editor from "./internal/Editor.js"
 export * as EditorSchema from "./internal/EditorSchema.js"
 export * from "./internal/Error.js"

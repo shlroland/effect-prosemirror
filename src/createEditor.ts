@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 
 import type { CommandTag } from "./internal/Command.js"
-import * as EditingCore from "./internal/EditingCore.js"
+import * as EditingCore from "./internal/editing-core/EditingCore.js"
 import * as EditorInstance from "./internal/Editor.js"
 import type { EditorMountError } from "./internal/Error.js"
 import type { Extension } from "./internal/Extension.js"

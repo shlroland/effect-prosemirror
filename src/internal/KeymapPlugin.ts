@@ -3,7 +3,7 @@ import type { Command, Plugin } from "prosemirror-state"
 
 import type { CommandInvocation } from "./CommandInvocation.js"
 import type { CommandTag } from "./Command.js"
-import type { CommandSurface } from "./EditingCore.js"
+import type { CommandSurface } from "./editing-core/EditingCore.js"
 import { name as chordName } from "./KeyChord.js"
 import type { StaticKeymap } from "./Keymap.js"
 
