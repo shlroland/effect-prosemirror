@@ -1,24 +1,24 @@
 import { Context, Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 
-import * as Command from "../../src/core/Command.js"
-import * as EditingCore from "../../src/core/EditingCore.js"
-import * as EditorSchema from "../../src/core/EditorSchema.js"
 import {
+  Command,
   CommandExecutionError,
   CommandNotAvailableError,
+  EditingCore,
   EditorDestroyedError,
+  EditorSchema,
+  Extension,
   FinalValidationError,
+  InitialContent,
   InitialContentDocumentUnavailableError,
   InvalidInitialContentError,
   MissingServiceError,
+  Priority,
   ServiceLayerCreationError,
   TransactionExecutionError,
   TransactionReentryError,
-} from "../../src/core/Error.js"
-import * as Extension from "../../src/core/Extension.js"
-import * as InitialContent from "../../src/core/InitialContent.js"
-import { Priority } from "../../src/core/Priority.js"
+} from "../../src/core.js"
 
 const schemaExtension = Extension.union(
   Extension.NodeSpec({ name: "doc", content: "paragraph+" }),

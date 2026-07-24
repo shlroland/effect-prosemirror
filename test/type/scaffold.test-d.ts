@@ -1,6 +1,5 @@
 import { expectTypeOf } from "expect-type"
 
-import type { Priority } from "../../src/core/Priority.js"
-import { Priority as PriorityValues } from "../../src/core/Priority.js"
+import { Priority } from "../../src/core.js"
 
-expectTypeOf(PriorityValues.High).toMatchTypeOf<Priority>()
+expectTypeOf(Priority.High).toMatchTypeOf<Priority.Priority>()

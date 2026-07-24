@@ -1,7 +1,6 @@
 import { expectTypeOf } from "expect-type"
 
-import * as Command from "../../src/core/Command.js"
-import * as Extension from "../../src/core/Extension.js"
+import { Command, Extension } from "../../src/core.js"
 
 class SetHeading extends Command.Tag("setHeading")<SetHeading, [level: number]>() {}
 

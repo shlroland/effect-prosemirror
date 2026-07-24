@@ -1,10 +1,10 @@
 import { Effect } from "effect"
 
-import type { CommandTag } from "./core/Command.js"
-import * as EditingCore from "./core/EditingCore.js"
-import * as EditorInstance from "./core/Editor.js"
-import type { EditorMountError } from "./core/Error.js"
-import type { Extension } from "./core/Extension.js"
+import type { CommandTag } from "./internal/Command.js"
+import * as EditingCore from "./internal/EditingCore.js"
+import * as EditorInstance from "./internal/Editor.js"
+import type { EditorMountError } from "./internal/Error.js"
+import type { Extension } from "./internal/Extension.js"
 
 export type Options<ExtensionValue extends Extension.Any = Extension.Any> =
   EditingCore.CreateOptions<ExtensionValue> & {

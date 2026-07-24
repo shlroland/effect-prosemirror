@@ -1,8 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import { expectTypeOf } from "expect-type"
 
-import * as EditingCore from "../../src/core/EditingCore.js"
-import * as Extension from "../../src/core/Extension.js"
+import { EditingCore, Extension } from "../../src/core.js"
 import { createEditor } from "../../src/index.js"
 
 const schema = Extension.union(

@@ -1,8 +1,6 @@
 import { expectTypeOf } from "expect-type"
 
-import * as Command from "../../src/core/Command.js"
-import * as EditingCore from "../../src/core/EditingCore.js"
-import * as Extension from "../../src/core/Extension.js"
+import { Command, EditingCore, Extension } from "../../src/core.js"
 
 const schema = Extension.union(
   Extension.NodeSpec({ name: "doc", content: "paragraph+" }),

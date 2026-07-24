@@ -1,8 +1,7 @@
 import * as EffectSchema from "effect/Schema"
 import { expectTypeOf } from "expect-type"
 
-import * as Extension from "../../src/core/Extension.js"
-import { Priority } from "../../src/core/Priority.js"
+import { Extension, Priority } from "../../src/core.js"
 
 const first = Extension.contribution("test.first", { value: 1 })
 const second = Extension.contribution("test.second", { value: 2 })

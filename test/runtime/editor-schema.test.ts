@@ -2,9 +2,7 @@ import * as EffectSchema from "effect/Schema"
 import { Mark } from "prosemirror-model"
 import { describe, expect, it } from "vitest"
 
-import * as Extension from "../../src/core/Extension.js"
-import { Priority } from "../../src/core/Priority.js"
-import * as EditorSchema from "../../src/core/EditorSchema.js"
+import { EditorSchema, Extension, Priority } from "../../src/core.js"
 
 describe("EditorSchema", () => {
   it("merges same-name node specs", () => {

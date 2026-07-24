@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { Priority } from "../../src/core/Priority.js"
+import { Priority } from "../../src/core.js"
 
 describe("scaffold", () => {
   it("exports priority values", () => {

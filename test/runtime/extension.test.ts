@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import * as Command from "../../src/core/Command.js"
-import * as Extension from "../../src/core/Extension.js"
-import { Priority } from "../../src/core/Priority.js"
+import { Command, Extension, Priority } from "../../src/core.js"
 
 describe("Extension", () => {
   it("combines contributions in vararg order", () => {

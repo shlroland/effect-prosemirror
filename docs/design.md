@@ -54,10 +54,7 @@ Core imports:
 
 ```ts
 import { EditingCore, Editor, Extension, Command, Priority, createEditor } from "effect-prosemirror"
-import { EditingCore } from "effect-prosemirror/core/EditingCore"
-import { Editor } from "effect-prosemirror/core/Editor"
-import { Extension } from "effect-prosemirror/core/Extension"
-import { Command } from "effect-prosemirror/core/Command"
+import { EditingCore, Editor, Extension, Command } from "effect-prosemirror/core"
 ```
 
 The first phase should provide core exports. Extension and framework paths can be added as they are implemented.
@@ -418,7 +415,7 @@ const program = Effect.gen(function* () {
 
 `EditingCore.make(options)` is the lower-level scoped constructor with `Effect.Effect<EditingCore, EditingCoreError, Requirements | Scope>`. `EditingCore.layer(options)` provides `Layer.Layer<EditingCore, EditingCoreError, Requirements>`. `EditingCore.create(options)` is the synchronous convenience constructor: it owns an internal Scope until `core.destroy()` and throws the same tagged errors that Effect-native construction places in its error channel. No separate `EditorService` contract is introduced.
 
-The service obtained through `yield* EditingCore` exposes the same synchronous ProseMirror-oriented surface as `EditingCore.create`: command operations and `transact` return direct booleans, while state and schema are direct getters. Effect manages construction, requirements, Scope, and future Actions; it does not duplicate these operations as `runEffect` or `transactEffect` and does not turn a synchronous ProseMirror Command into an Effect Command. Exceptional synchronous failures are still normalized to the agreed `Data.TaggedError` values.
+The service obtained through `yield* EditingCore.EditingCore` exposes the same synchronous ProseMirror-oriented surface as `EditingCore.create`: command operations and `transact` return direct booleans, while state and schema are direct getters. Effect manages construction, requirements, Scope, and future Actions; it does not duplicate these operations as `runEffect` or `transactEffect` and does not turn a synchronous ProseMirror Command into an Effect Command. Exceptional synchronous failures are still normalized to the agreed `Data.TaggedError` values.
 
 `Editor.mount` binds an existing core to a DOM element and returns an Editor Instance. `createEditor` is the convenience constructor for application and framework code that creates and mounts a core in one call:
 

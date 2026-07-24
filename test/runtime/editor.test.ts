@@ -2,11 +2,11 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import * as Command from "../../src/core/Command.js"
-import * as CommandInvocation from "../../src/core/CommandInvocation.js"
-import * as EditingCore from "../../src/core/EditingCore.js"
-import * as Editor from "../../src/core/Editor.js"
 import {
+  Command,
+  CommandInvocation,
+  EditingCore,
+  Editor,
   EditorAlreadyMountedError,
   EditorDestructionError,
   EditorDestroyedError,
@@ -14,13 +14,13 @@ import {
   EditorUnmountError,
   EditorUnmountedError,
   EditorViewSynchronizationError,
-} from "../../src/core/Error.js"
-import * as Extension from "../../src/core/Extension.js"
-import * as Key from "../../src/core/Key.js"
-import * as KeyChord from "../../src/core/KeyChord.js"
-import * as Keymap from "../../src/core/Keymap.js"
+  Extension,
+  Key,
+  KeyChord,
+  Keymap,
+  Priority,
+} from "../../src/core.js"
 import { createEditor } from "../../src/index.js"
-import { Priority } from "../../src/core/Priority.js"
 
 const schemaExtension = Extension.union(
   Extension.NodeSpec({ name: "doc", content: "paragraph+", toDOM: () => ["div", 0] as const }),

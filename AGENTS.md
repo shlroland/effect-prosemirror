@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a private TypeScript package for an Effect-managed ProseMirror runtime. Public source lives in `src/`, with the current core API under `src/core/` and the package entry point at `src/index.ts`. Runtime tests are in `test/runtime/**/*.test.ts`; compile-time type tests are in `test/type/**/*.test-d.ts`. Design context belongs in `CONTEXT.md`, `docs/design.md`, `docs/implementation-plan.md`, and ADRs under `docs/adr/`. Generated build output goes to `dist/` and should not be edited by hand.
+This is a private TypeScript package for an Effect-managed ProseMirror runtime. Public source lives in `src/`, with the core API re-exported from `src/core.ts`, internal implementation under `src/internal/`, and the package entry point at `src/index.ts`. Runtime tests are in `test/runtime/**/*.test.ts`; compile-time type tests are in `test/type/**/*.test-d.ts`. Design context belongs in `CONTEXT.md`, `docs/design.md`, `docs/implementation-plan.md`, and ADRs under `docs/adr/`. Generated build output goes to `dist/` and should not be edited by hand.
 
 ## Build, Test, and Development Commands
 

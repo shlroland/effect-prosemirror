@@ -1,15 +1,18 @@
 import { Effect } from "effect"
 import { describe, expect, it } from "vitest"
 
-import * as Command from "../../src/core/Command.js"
-import * as CommandInvocation from "../../src/core/CommandInvocation.js"
-import * as EditingCore from "../../src/core/EditingCore.js"
-import { FinalValidationError, InvalidKeyError } from "../../src/core/Error.js"
-import * as Extension from "../../src/core/Extension.js"
-import * as Key from "../../src/core/Key.js"
-import * as KeyChord from "../../src/core/KeyChord.js"
-import * as Keymap from "../../src/core/Keymap.js"
-import { Priority } from "../../src/core/Priority.js"
+import {
+  Command,
+  CommandInvocation,
+  EditingCore,
+  Extension,
+  FinalValidationError,
+  InvalidKeyError,
+  Key,
+  KeyChord,
+  Keymap,
+  Priority,
+} from "../../src/core.js"
 
 class SetHeading extends Command.Tag("setHeading")<SetHeading, [level: number]>() {}
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import * as Command from "../../src/core/Command.js"
+import { Command } from "../../src/core.js"
 
 class SetText extends Command.Tag("setText")<SetText, [text: string]>() {}
 
