@@ -158,7 +158,7 @@ Validation:
 
 Add discrete asynchronous editing intents without weakening ProseMirror's synchronous transaction model.
 
-Status: design complete; implementation not started.
+Status: complete.
 
 Deliverables:
 
@@ -183,3 +183,42 @@ Validation:
 - runtime tests for atomic Reentry against the latest state
 - runtime tests for unmount survival and destroy interruption
 - runtime tests for caller interruption and Action finalizers
+
+## Phase 8: ProseMirror Plugin Contributions
+
+Add the smallest Plugin contribution without introducing a second plugin protocol.
+
+Status: design complete; implementation not started.
+
+The public seam is `Extension.Plugin(plugin)`, where `plugin` is a normal
+`prosemirror-state` `Plugin`. The Editing Core compiles contributed plugins in
+descending Extension priority and then declaration order, supplies that list to
+`EditorState.create`, and continues to own every transaction application. This
+means plugin state, `filterTransaction`, and `appendTransaction` work both
+headlessly and while mounted; ProseMirror owns Plugin View creation, update, and
+destruction through the mounted `EditorView`.
+
+Effect-backed plugins are deliberately deferred. They need a separate scoped
+lifecycle and asynchronous failure model, so adding them to this small static
+contribution would make its interface shallow and ambiguous.
+
+Deliverables:
+
+- `Extension.Plugin(plugin)` contribution for one normal ProseMirror Plugin
+- priority-ordered plugin compilation into the initial Editor State
+- `PluginConfigurationError` for invalid plugin sets, including duplicate
+  ProseMirror keyed plugins
+- documentation that `PluginKey` remains the normal way to read plugin state
+- a minimal append-transaction fixture to validate Action target mapping through
+  appended transactions
+
+Validation:
+
+- runtime tests for plugin state initialization and transaction application in
+  an unmounted Editing Core
+- runtime tests for `filterTransaction` rejection and `appendTransaction`
+  application
+- jsdom tests for Plugin View mount, update, unmount, and remount lifecycle
+- runtime test for invalid keyed-plugin configuration
+- Action regression test whose Tracked Selection maps through an appended
+  transaction

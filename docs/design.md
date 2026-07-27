@@ -30,6 +30,8 @@ Extension.Keymap(...bindings)
 
 Extension.Require(serviceTag)
 
+Extension.Actions(...definitions)
+
 EditingCore.make(options)
 EditingCore.layer(options)
 EditingCore.create(options)
@@ -40,7 +42,6 @@ createEditor(options)
 Deferred APIs:
 
 ```ts
-Extension.Actions(...)
 Extension.Plugin(...)
 Extension.Layer(...)
 Extension.DynamicKeymap(...)
@@ -611,6 +612,44 @@ The Action model is:
 - caller interruption or Editing Core Destroy interrupts the Action Execution, while Editor Unmount does not
 
 The first Action interface exposes only `Action.Tag`, `Action.define`, `Extension.Actions`, `actions.run`, `Action.trackSelection`, and `Action.reenter`. It does not expose a generic Target Protocol, Promise or Fiber convenience methods, progress state, or Command-style definition merging. Tracked Target Change is reported to the Action, while Tracked Target Loss prevents its Reentry. This preserves ProseMirror's synchronous state and transaction model while keeping Effect execution explicit.
+
+## Plugin Contributions
+
+The first Plugin module has one deliberately small interface:
+
+```ts
+Extension.Plugin(plugin)
+```
+
+`plugin` is a normal `prosemirror-state` `Plugin`, not an Effect wrapper or a
+new plugin-definition format. This is the seam at which an Extension contributes
+standard ProseMirror behavior. The Editing Core hides compilation, ordering,
+state creation, and error normalization behind that one interface.
+
+Contributed plugins are ordered by descending Extension priority and then
+Extension Union declaration order. The ordered list is supplied to
+`EditorState.create`, so a plugin's state field, `filterTransaction`, and
+`appendTransaction` participate in every Core transaction whether or not an
+Editor View is mounted. The Core remains the sole `EditorState` owner.
+
+Plugin View lifecycle remains ProseMirror's responsibility: an `EditorView`
+constructed by `Editor.mount` creates, updates, and destroys the contributed
+Plugin Views. Existing mount, synchronization, unmount, and destroy error
+boundaries therefore continue to apply without a separate adapter. Unmounting
+destroys Plugin Views but retains Core-owned plugin state; remounting creates
+new Plugin Views from that live state.
+
+Plugin state is read with the standard `PluginKey` against `core.state` or
+`editor.state`; no parallel Plugin Surface is introduced. Invalid plugin sets,
+such as duplicate keyed plugins, are normalized as
+`PluginConfigurationError { cause }` during Core creation rather than exposing a
+raw ProseMirror exception.
+
+This phase intentionally does not make Plugins Effectful. An Effect-backed
+Plugin needs a distinct Editor Scope lifecycle for fibers, finalizers, service
+requirements, and asynchronous failure reporting. Combining that with a static
+ProseMirror Plugin Contribution would enlarge the interface before there is a
+second concrete adapter to justify it.
 
 ## Testing Strategy
 

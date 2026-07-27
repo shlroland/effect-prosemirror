@@ -120,8 +120,12 @@ _Avoid_: Implicit Node conversion, silent schema replacement
 The boundary where callers may use Effect Schema to pre-decode unknown external input before passing `InitialContent.JSON`. Editing Core does not introduce a second generic Effect Schema decoder for NodeJSON; target-schema `Node.fromJSON` remains authoritative for ProseMirror document validity.
 _Avoid_: Duplicate NodeJSON validation pipeline, InitialContent schema adapter
 
+**State Plugin Contribution**:
+An `Extension.Plugin(plugin)` contribution that installs one normal ProseMirror State Plugin in the Editing Core. Its state field, transaction filter, and append behavior run through the Core-owned EditorState; its Plugin View is owned by a mounted EditorView.
+_Avoid_: Plugin wrapper, Core plugin surface, View-only plugin
+
 **Effect-backed Plugin**:
-A normal ProseMirror plugin whose side effects, background work, and external dependencies are managed by Effect services inside the Editor Scope.
+A future normal ProseMirror plugin whose side effects, background work, and external dependencies are managed by Effect services inside the Editor Scope. It is distinct from the initial State Plugin Contribution because it needs a scoped asynchronous lifecycle.
 _Avoid_: Effect plugin, async plugin
 
 **Service Requirement**:
