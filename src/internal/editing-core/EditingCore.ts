@@ -14,7 +14,7 @@ import type {
   Requirements,
   ValidatedOptions,
 } from "./EditingCoreTypes.js"
-import { InvalidInitialContentError } from "../Error.js"
+import { PluginConfigurationError } from "../Error.js"
 import * as EditorSchema from "../EditorSchema.js"
 import type { Extension } from "../Extension.js"
 import * as InitialDocument from "./InitialDocument.js"
@@ -53,13 +53,9 @@ const buildCore = (
 
   let state: EditorState
   try {
-    state = EditorState.create({ schema, doc })
+    state = EditorState.create({ schema, doc, plugins: compiled.plugins })
   } catch (cause) {
-    throw new InvalidInitialContentError({
-      source: options.initialContent?._tag ?? "Node",
-      reason: "InvalidDocument",
-      cause,
-    })
+    throw new PluginConfigurationError({ cause })
   }
 
   return Runtime.make(

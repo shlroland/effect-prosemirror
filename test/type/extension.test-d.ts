@@ -1,5 +1,6 @@
 import * as EffectSchema from "effect/Schema"
 import { expectTypeOf } from "expect-type"
+import { Plugin } from "prosemirror-state"
 
 import { Extension, Priority } from "../../src/core.js"
 
@@ -64,4 +65,14 @@ const checkedTextAlign = Extension.NodeAttr({
 })
 
 expectTypeOf(checkedTextAlign.spec.nodeAttr.type).toEqualTypeOf<"paragraph">()
+
+const statePlugin = new Plugin<number>({
+  state: {
+    init: () => 0,
+    apply: (_, value) => value,
+  },
+})
+const pluginExtension = Extension.Plugin(statePlugin)
+
+expectTypeOf(pluginExtension.spec.statePlugin).toEqualTypeOf<typeof statePlugin>()
 expectTypeOf(checkedTextAlign.spec.nodeAttr.attr).toEqualTypeOf<"textAlign">()

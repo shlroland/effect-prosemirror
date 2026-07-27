@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { Context, Data, Deferred, Effect, Exit, Fiber, Layer } from "effect"
-import { TextSelection } from "prosemirror-state"
+import { Plugin, TextSelection } from "prosemirror-state"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -157,6 +157,41 @@ describe("Action", () => {
     })
 
     core.transact(({ tr }) => tr.insertText("say ", 1))
+    yieldResponse(control, "earth")
+
+    await expect(Effect.runPromise(Fiber.join(fiber))).resolves.toEqual({
+      replacement: "earth",
+    })
+    expect(core.state.doc.textContent).toBe("say hello earth")
+
+    await core.destroy()
+  })
+
+  it("maps a Tracked Selection through a State Plugin appended transaction", async () => {
+    const control = makeRewriteControl()
+    const appendBeforeTarget = "test/append-before-target"
+    const core = EditingCore.create({
+      extension: Extension.union(
+        Basic.make(),
+        Extension.Actions(rewriteSelection),
+        Extension.Plugin(
+          new Plugin({
+            appendTransaction: (transactions, _, state) =>
+              transactions.some((transaction) => transaction.getMeta(appendBeforeTarget) === true)
+                ? state.tr.insertText("say ", 1)
+                : undefined,
+          }),
+        ),
+      ),
+      initialContent,
+      layer: Layer.succeed(Rewriter, control.service),
+    })
+    selectWorld(core)
+
+    const fiber = Effect.runFork(core.actions.run(RewriteSelection, "shorter"))
+    await Effect.runPromise(Deferred.await(control.started))
+
+    core.transact(({ tr }) => tr.setMeta(appendBeforeTarget, true))
     yieldResponse(control, "earth")
 
     await expect(Effect.runPromise(Fiber.join(fiber))).resolves.toEqual({

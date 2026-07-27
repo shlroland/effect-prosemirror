@@ -188,7 +188,7 @@ Validation:
 
 Add the smallest Plugin contribution without introducing a second plugin protocol.
 
-Status: design complete; implementation not started.
+Status: complete.
 
 The public seam is `Extension.Plugin(plugin)`, where `plugin` is a normal
 `prosemirror-state` `Plugin`. The Editing Core compiles contributed plugins in

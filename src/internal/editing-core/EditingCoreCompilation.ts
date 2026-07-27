@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, type Scope } from "effect"
+import type { Plugin as ProseMirrorPlugin } from "prosemirror-state"
 
 import type { ActionDefinition, ActionTag } from "../Action.js"
 import type { CommandDefinition, CommandTag } from "../Command.js"
@@ -19,9 +20,16 @@ interface IndexedDefinition {
   readonly index: number
 }
 
+interface IndexedPlugin {
+  readonly plugin: ProseMirrorPlugin
+  readonly priority: PriorityValue
+  readonly index: number
+}
+
 export interface CompiledExtension {
   readonly registry: ReadonlyMap<CommandTag.Any, readonly CommandDefinition[]>
   readonly actionRegistry: ReadonlyMap<ActionTag.Any, ActionDefinition>
+  readonly plugins: readonly ProseMirrorPlugin[]
   readonly keymap: Keymap.StaticKeymap
 }
 
@@ -66,6 +74,29 @@ const collectActionDefinitions = (extension: Extension.Any): readonly ActionDefi
   extension.contributions.flatMap((contribution) =>
     isActionContribution(contribution) ? contribution.payload : [],
   )
+
+const isStatePluginContribution = (
+  contribution: Contribution,
+): contribution is Contribution<"state.plugin", ProseMirrorPlugin> =>
+  contribution.type === "state.plugin"
+
+const collectPlugins = (extension: Extension.Any): readonly ProseMirrorPlugin[] => {
+  const plugins: IndexedPlugin[] = []
+  let index = 0
+
+  for (const contribution of extension.contributions) {
+    if (!isStatePluginContribution(contribution)) continue
+    plugins.push({ plugin: contribution.payload, priority: contribution.priority, index })
+    index += 1
+  }
+
+  return plugins
+    .sort((left, right) => {
+      const priorityDifference = priorityRank[right.priority] - priorityRank[left.priority]
+      return priorityDifference === 0 ? left.index - right.index : priorityDifference
+    })
+    .map(({ plugin }) => plugin)
+}
 
 const collectRuntimeDiagnostics = (
   extension: Extension.Any,
@@ -148,6 +179,7 @@ const buildActionRegistry = (
 export const compile = (extension: Extension.Any): CompiledExtension => {
   const definitions = collectDefinitions(extension)
   const actionDefinitions = collectActionDefinitions(extension)
+  const plugins = collectPlugins(extension)
   const keymap = Keymap.collect(extension)
   const diagnostics = collectRuntimeDiagnostics(extension, definitions, actionDefinitions, keymap)
   if (diagnostics.length > 0) throw new FinalValidationError({ diagnostics })
@@ -155,6 +187,7 @@ export const compile = (extension: Extension.Any): CompiledExtension => {
   return {
     registry: buildRegistry(definitions),
     actionRegistry: buildActionRegistry(actionDefinitions),
+    plugins,
     keymap,
   }
 }

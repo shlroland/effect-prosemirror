@@ -58,6 +58,10 @@ export class InitialContentCreationError extends Data.TaggedError("InitialConten
   readonly reason: "TopNodeCannotCreateAndFill"
 }> {}
 
+export class PluginConfigurationError extends Data.TaggedError("PluginConfigurationError")<{
+  readonly cause: unknown
+}> {}
+
 export class MissingServiceError extends Data.TaggedError("MissingServiceError")<{
   readonly services: readonly string[]
 }> {}
@@ -131,6 +135,7 @@ export type EditingCoreError =
   | InitialContentDocumentUnavailableError
   | InvalidInitialContentError
   | InitialContentCreationError
+  | PluginConfigurationError
   | MissingServiceError
   | ServiceLayerCreationError
   | InvalidKeyError
