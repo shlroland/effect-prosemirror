@@ -46,7 +46,7 @@ Validation:
 
 Implement schema contribution APIs and merge behavior.
 
-Status: in progress.
+Status: complete.
 
 Deliverables:
 
@@ -153,3 +153,33 @@ Validation:
 - smoke test creating an editor with `Basic.make()` (complete)
 - smoke test inserting text through command surface or `transact` (complete through command surface)
 - type tests proving `Basic.make()` produces expected nodes and commands (complete)
+
+## Phase 7: Scoped Actions and tracked Reentry
+
+Add discrete asynchronous editing intents without weakening ProseMirror's synchronous transaction model.
+
+Status: design complete; implementation not started.
+
+Deliverables:
+
+- `Action.Tag(name)<Self, Args, Success, Failure>()`
+- `Action.define(tag, run)` with inferred Effect requirements
+- variadic `Extension.Actions(...definitions)`
+- Tag-driven `actions.run` returning a lazy Effect
+- Editor Scope-managed Action Executions with caller and core-destroy interruption
+- opaque Tracked Selection capture with immutable snapshot data
+- mapping through every accepted root and appended transaction
+- atomic Reentry against the latest Editing Core state
+- explicit Tracked Target Change and Tracked Target Loss behavior
+- retained Action service Context inside the Editing Core
+- Final Validation for duplicate Action definitions and names
+
+Validation:
+
+- type tests for Action arguments, success, failure, and inferred requirements
+- runtime tests for lazy execution and unavailable Action Tags
+- runtime tests for mapping before and outside a tracked selection
+- runtime tests for target change and target loss
+- runtime tests for atomic Reentry against the latest state
+- runtime tests for unmount survival and destroy interruption
+- runtime tests for caller interruption and Action finalizers

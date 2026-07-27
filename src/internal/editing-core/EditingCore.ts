@@ -5,6 +5,7 @@ import * as Compilation from "./EditingCoreCompilation.js"
 import * as Runtime from "./EditingCoreRuntime.js"
 import type {
   Any,
+  AvailableActionTags,
   AvailableCommandTags,
   Core,
   CreateOptions,
@@ -20,7 +21,9 @@ import * as InitialDocument from "./InitialDocument.js"
 
 export type {
   Any,
+  AvailableActionTags,
   AvailableCommandTags,
+  ActionSurface,
   CommandSurface,
   Core,
   CreateOptions,
@@ -39,7 +42,11 @@ export type {
 /** @internal */
 export const bindView = Runtime.bindView
 
-const buildCore = (options: Options, scope: Scope.CloseableScope): Any => {
+const buildCore = (
+  options: Options,
+  scope: Scope.CloseableScope,
+  actionContext: Context.Context<any>,
+): Any => {
   const compiled = Compilation.compile(options.extension)
   const schema = EditorSchema.create(options.extension)
   const doc = InitialDocument.create(schema, options.initialContent)
@@ -55,19 +62,27 @@ const buildCore = (options: Options, scope: Scope.CloseableScope): Any => {
     })
   }
 
-  return Runtime.make(scope, compiled.registry, schema, state, compiled.keymap)
+  return Runtime.make(
+    scope,
+    compiled.registry,
+    compiled.actionRegistry,
+    actionContext,
+    schema,
+    state,
+    compiled.keymap,
+  )
 }
 
 export class EditingCore extends Context.Tag("effect-prosemirror/EditingCore")<EditingCore, Any>() {
   static make<const ExtensionValue extends Extension.Any>(
     options: ValidatedOptions<ExtensionValue>,
   ): Effect.Effect<
-    Core<AvailableCommandTags<ExtensionValue>>,
+    Core<AvailableCommandTags<ExtensionValue>, AvailableActionTags<ExtensionValue>>,
     CreationError,
     Requirements<ExtensionValue> | Scope.Scope
   > {
     return (make as Function)(options) as Effect.Effect<
-      Core<AvailableCommandTags<ExtensionValue>>,
+      Core<AvailableCommandTags<ExtensionValue>, AvailableActionTags<ExtensionValue>>,
       CreationError,
       Requirements<ExtensionValue> | Scope.Scope
     >
@@ -85,26 +100,22 @@ export class EditingCore extends Context.Tag("effect-prosemirror/EditingCore")<E
 
   static create<const ExtensionValue extends Extension.Any>(
     options: CreateOptions<ExtensionValue>,
-  ): Core<AvailableCommandTags<ExtensionValue>> {
-    return (create as Function)(options) as Core<AvailableCommandTags<ExtensionValue>>
+  ): Core<AvailableCommandTags<ExtensionValue>, AvailableActionTags<ExtensionValue>> {
+    return (create as Function)(options) as Core<
+      AvailableCommandTags<ExtensionValue>,
+      AvailableActionTags<ExtensionValue>
+    >
   }
 }
 
-export const make = <const ExtensionValue extends Extension.Any>(
-  options: ValidatedOptions<ExtensionValue>,
-): Effect.Effect<
-  Core<AvailableCommandTags<ExtensionValue>>,
-  CreationError,
-  Requirements<ExtensionValue> | Scope.Scope
-> =>
+const makeInternal = (options: Options): Effect.Effect<Any, CreationError, Scope.Scope> =>
   Effect.gen(function* () {
     const scope = yield* Scope.make()
-    const core = yield* Compilation.validateServiceRequirements<Requirements<ExtensionValue>>(
-      options.extension,
-    ).pipe(
+    const actionContext = yield* Effect.context<any>()
+    const core = yield* Compilation.validateServiceRequirements<any>(options.extension).pipe(
       Effect.zipRight(
         Effect.try({
-          try: () => buildCore(options, scope),
+          try: () => buildCore(options, scope, actionContext),
           catch: (error) => error as CreationError,
         }),
       ),
@@ -112,8 +123,21 @@ export const make = <const ExtensionValue extends Extension.Any>(
     )
 
     yield* Effect.addFinalizer(() => Effect.promise(() => core.destroy()))
-    return core as Core<AvailableCommandTags<ExtensionValue>>
+    return core
   })
+
+export const make = <const ExtensionValue extends Extension.Any>(
+  options: ValidatedOptions<ExtensionValue>,
+): Effect.Effect<
+  Core<AvailableCommandTags<ExtensionValue>, AvailableActionTags<ExtensionValue>>,
+  CreationError,
+  Requirements<ExtensionValue> | Scope.Scope
+> =>
+  (makeInternal as Function)(options) as Effect.Effect<
+    Core<AvailableCommandTags<ExtensionValue>, AvailableActionTags<ExtensionValue>>,
+    CreationError,
+    Requirements<ExtensionValue> | Scope.Scope
+  >
 
 export const layer = <const ExtensionValue extends Extension.Any>(
   options: ValidatedOptions<ExtensionValue>,
@@ -125,15 +149,18 @@ export const layer = <const ExtensionValue extends Extension.Any>(
 
 export const create = <const ExtensionValue extends Extension.Any>(
   options: CreateOptions<ExtensionValue>,
-): Core<AvailableCommandTags<ExtensionValue>> => {
+): Core<AvailableCommandTags<ExtensionValue>, AvailableActionTags<ExtensionValue>> => {
   const scope = Effect.runSync(Scope.make())
   try {
-    Compilation.buildSynchronousServiceContext(
+    const actionContext = Compilation.buildSynchronousServiceContext(
       options.extension,
       scope,
       "layer" in options ? options.layer : undefined,
     )
-    return buildCore(options, scope) as Core<AvailableCommandTags<ExtensionValue>>
+    return buildCore(options, scope, actionContext) as Core<
+      AvailableCommandTags<ExtensionValue>,
+      AvailableActionTags<ExtensionValue>
+    >
   } catch (error) {
     void Effect.runPromise(Scope.close(scope, Exit.void))
     throw error

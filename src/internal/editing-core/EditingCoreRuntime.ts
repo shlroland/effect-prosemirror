@@ -1,10 +1,14 @@
-import { Effect, Exit, Scope } from "effect"
+import { Context, Effect, Exit, Fiber, Scope } from "effect"
 import type { Schema } from "prosemirror-model"
 import { EditorState, Transaction } from "prosemirror-state"
 import type { EditorView } from "prosemirror-view"
 
+import * as Action from "../Action.js"
+import type { ActionDefinition, ActionTag } from "../Action.js"
 import type { CommandDefinition, CommandTag } from "../Command.js"
 import {
+  ActionNotAvailableError,
+  ActionReentryError,
   CommandExecutionError,
   CommandNotAvailableError,
   EditorAlreadyMountedError,
@@ -14,10 +18,13 @@ import {
   EditorViewSynchronizationError,
   TransactionExecutionError,
   TransactionReentryError,
+  TrackedSelectionEmptyError,
+  TrackedTargetLostError,
 } from "../Error.js"
 import type * as Keymap from "../Keymap.js"
 import type {
   Any,
+  ActionSurface,
   CommandSurface,
   Core,
   MountedTransactionContext,
@@ -38,21 +45,28 @@ export const bindView = <Available extends CommandTag.Any>(
   options: ViewBindingOptions,
 ): ViewBinding<Available> => (core as ViewBindableCore<Available>)[ViewBindingTypeId](options)
 
-class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
+class CoreImpl<
+  AvailableCommands extends CommandTag.Any,
+  AvailableActions extends ActionTag.Any,
+> implements Core<AvailableCommands, AvailableActions> {
   readonly _tag = "EditingCore"
-  readonly commands: CommandSurface<Available>
+  readonly commands: CommandSurface<AvailableCommands>
+  readonly actions: ActionSurface<AvailableActions>
 
-  readonly [ViewBindingTypeId] = (options: ViewBindingOptions): ViewBinding<Available> =>
+  readonly [ViewBindingTypeId] = (options: ViewBindingOptions): ViewBinding<AvailableCommands> =>
     this.createViewBinding(options)
 
   private destroyed = false
   private writing = false
   private destroyPromise: Promise<void> | undefined
   private viewBinding: ViewBindingOptions | undefined
+  private readonly trackedSelections = new Set<Action.TrackedSelection>()
 
   constructor(
     private readonly scope: Scope.CloseableScope,
     private readonly registry: ReadonlyMap<CommandTag.Any, readonly CommandDefinition[]>,
+    private readonly actionRegistry: ReadonlyMap<ActionTag.Any, ActionDefinition>,
+    private readonly actionContext: Context.Context<any>,
     private readonly editorSchema: Schema,
     private editorState: EditorState,
     readonly keymap: Keymap.StaticKeymap,
@@ -61,6 +75,14 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
       run: (tag, ...args) => this.run(tag, args),
       canRun: (tag, ...args) => this.canRun(tag, args),
       isActive: (tag, ...args) => this.isActive(tag, args),
+    }
+    this.actions = {
+      run: (tag, ...args) =>
+        this.runAction(tag, args) as Effect.Effect<
+          ActionTag.Success<typeof tag>,
+          ActionTag.Failure<typeof tag> | Action.RuntimeError,
+          never
+        >,
     }
   }
 
@@ -239,10 +261,138 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     return false
   }
 
+  private actionDefinitionFor(tag: ActionTag.Any): ActionDefinition {
+    const definition = this.actionRegistry.get(tag)
+    if (!definition) throw new ActionNotAvailableError({ action: tag.actionName })
+    return definition
+  }
+
+  private runAction(
+    tag: ActionTag.Any,
+    args: readonly unknown[],
+  ): Effect.Effect<unknown, unknown, never> {
+    return Effect.suspend(() => {
+      if (this.destroyed) return Effect.fail(new EditorDestroyedError())
+
+      let definition: ActionDefinition
+      try {
+        definition = this.actionDefinitionFor(tag)
+      } catch (error) {
+        return Effect.fail(error as ActionNotAvailableError)
+      }
+
+      const runtime = this.createActionRuntime()
+      let program: Effect.Effect<unknown, unknown, unknown>
+      try {
+        program = definition.run(...args)
+      } catch (cause) {
+        return Effect.fail(new ActionReentryError({ cause }))
+      }
+
+      const provided = Effect.provide(
+        Effect.provideService(program, Action.ActionRuntimeContext, runtime),
+        this.actionContext,
+      )
+
+      const scope = this.scope
+      return Effect.uninterruptibleMask((restore) =>
+        Effect.gen(function* () {
+          const fiber = yield* Effect.forkIn(restore(provided), scope)
+          return yield* restore(Fiber.join(fiber)).pipe(
+            Effect.onInterrupt(() => Fiber.interrupt(fiber).pipe(Effect.asVoid)),
+          )
+        }),
+      ).pipe(Effect.ensuring(Effect.sync(runtime.release)))
+    })
+  }
+
+  private createActionRuntime(): Action.ActionRuntime & { readonly release: () => void } {
+    const owned = new Set<Action.TrackedSelection>()
+
+    return {
+      trackSelection: (options) =>
+        Effect.suspend<
+          Action.TrackedSelection,
+          TrackedSelectionEmptyError | EditorDestroyedError,
+          never
+        >(() => {
+          if (this.destroyed) return Effect.fail(new EditorDestroyedError())
+
+          const selection = this.editorState.selection
+          if (options.requireNonEmpty && selection.empty) {
+            return Effect.fail(new TrackedSelectionEmptyError())
+          }
+
+          const target = Action.makeTrackedSelection({
+            from: selection.from,
+            to: selection.to,
+            text: this.editorState.doc.textBetween(selection.from, selection.to),
+          })
+          owned.add(target)
+          this.trackedSelections.add(target)
+          return Effect.succeed(target)
+        }),
+      reenter: <Success, Failure>(
+        target: Action.TrackedSelection,
+        callback: (context: Action.ReentryContext) => Action.ReentryDecision<Success, Failure>,
+      ) =>
+        Effect.suspend<
+          Success,
+          Failure | TrackedTargetLostError | EditorDestroyedError | ActionReentryError,
+          never
+        >(() => {
+          const state = Action.trackedSelectionState(target)
+          if (this.destroyed) return Effect.fail(new EditorDestroyedError())
+          if (!state.active || state.lost) return Effect.fail(new TrackedTargetLostError())
+          if (this.writing) {
+            return Effect.fail(new ActionReentryError({ cause: new TransactionReentryError() }))
+          }
+
+          this.writing = true
+          try {
+            let decision: Action.ReentryDecision<Success, Failure>
+            try {
+              decision = callback({
+                state: this.editorState,
+                schema: this.editorSchema,
+                tr: this.editorState.tr,
+                target: {
+                  from: state.from,
+                  to: state.to,
+                  changed: state.changed,
+                },
+              })
+            } catch (cause) {
+              return Effect.fail(new ActionReentryError({ cause }))
+            }
+
+            if (decision._tag === "Reject") return Effect.fail(decision.error)
+
+            try {
+              this.applyTransaction(decision.transaction)
+              return Effect.succeed(decision.value)
+            } catch (cause) {
+              return Effect.fail(new ActionReentryError({ cause }))
+            }
+          } finally {
+            this.writing = false
+          }
+        }),
+      release: () => {
+        for (const target of owned) {
+          Action.trackedSelectionState(target).active = false
+          this.trackedSelections.delete(target)
+        }
+        owned.clear()
+      },
+    }
+  }
+
   private applyTransaction(transaction: Transaction): boolean {
     const result = this.editorState.applyTransaction(transaction)
     if (result.transactions.length === 0) return false
     this.editorState = result.state
+    this.mapTrackedSelections(result.transactions)
 
     const binding = this.viewBinding
     if (binding) {
@@ -261,7 +411,39 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
     return true
   }
 
-  private createViewBinding(options: ViewBindingOptions): ViewBinding<Available> {
+  private mapTrackedSelections(transactions: readonly Transaction[]): void {
+    for (const transaction of transactions) {
+      for (const target of this.trackedSelections) {
+        const state = Action.trackedSelectionState(target)
+        if (!state.active || state.lost) continue
+
+        for (const step of transaction.steps) {
+          const map = step.getMap()
+          const from = state.from
+          const to = state.to
+
+          map.forEach((oldStart, oldEnd) => {
+            if (oldStart === oldEnd) {
+              if (oldStart > from && oldStart < to) state.changed = true
+              return
+            }
+
+            if (oldStart < to && oldEnd > from) {
+              state.changed = true
+              if (oldStart <= from && oldEnd >= to) state.lost = true
+            }
+          })
+
+          const mappedFrom = map.mapResult(from, 1)
+          const mappedTo = map.mapResult(to, -1)
+          state.from = mappedFrom.pos
+          state.to = mappedTo.pos
+        }
+      }
+    }
+  }
+
+  private createViewBinding(options: ViewBindingOptions): ViewBinding<AvailableCommands> {
     this.assertLive()
     if (this.viewBinding) throw new EditorAlreadyMountedError()
 
@@ -316,7 +498,9 @@ class CoreImpl<Available extends CommandTag.Any> implements Core<Available> {
 export const make = (
   scope: Scope.CloseableScope,
   registry: ReadonlyMap<CommandTag.Any, readonly CommandDefinition[]>,
+  actionRegistry: ReadonlyMap<ActionTag.Any, ActionDefinition>,
+  actionContext: Context.Context<any>,
   schema: Schema,
   state: EditorState,
   keymap: Keymap.StaticKeymap,
-): Any => new CoreImpl(scope, registry, schema, state, keymap)
+): Any => new CoreImpl(scope, registry, actionRegistry, actionContext, schema, state, keymap)

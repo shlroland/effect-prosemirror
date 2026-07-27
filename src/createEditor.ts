@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 
+import type { ActionTag } from "./internal/Action.js"
 import type { CommandTag } from "./internal/Command.js"
 import * as EditingCore from "./internal/editing-core/EditingCore.js"
 import * as EditorInstance from "./internal/Editor.js"
@@ -15,9 +16,13 @@ export type CreationError = EditingCore.CreationError | EditorMountError
 
 export const createEditor = <const ExtensionValue extends Extension.Any>(
   options: Options<ExtensionValue>,
-): EditorInstance.Editor<EditingCore.AvailableCommandTags<ExtensionValue>> => {
+): EditorInstance.Editor<
+  EditingCore.AvailableCommandTags<ExtensionValue>,
+  EditingCore.AvailableActionTags<ExtensionValue>
+> => {
   const core = (EditingCore.create as Function)(options) as EditingCore.Core<
-    EditingCore.AvailableCommandTags<ExtensionValue>
+    EditingCore.AvailableCommandTags<ExtensionValue>,
+    EditingCore.AvailableActionTags<ExtensionValue>
   >
 
   try {
@@ -29,5 +34,7 @@ export const createEditor = <const ExtensionValue extends Extension.Any>(
   }
 }
 
-export type CreatedEditor<Available extends CommandTag.Any = CommandTag.Any> =
-  EditorInstance.Editor<Available>
+export type CreatedEditor<
+  AvailableCommands extends CommandTag.Any = CommandTag.Any,
+  AvailableActions extends ActionTag.Any = ActionTag.Any,
+> = EditorInstance.Editor<AvailableCommands, AvailableActions>

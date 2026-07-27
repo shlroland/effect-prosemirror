@@ -2,6 +2,7 @@ import type { Schema } from "prosemirror-model"
 import type { EditorState, Transaction } from "prosemirror-state"
 import { EditorView } from "prosemirror-view"
 
+import type { ActionTag } from "./Action.js"
 import type { CommandTag } from "./Command.js"
 import * as EditingCore from "./editing-core/EditingCore.js"
 import {
@@ -16,24 +17,31 @@ export interface TransactionContext extends EditingCore.MountedTransactionContex
 
 export type Transact = (callback: (context: TransactionContext) => Transaction | false) => boolean
 
-export interface Editor<Available extends CommandTag.Any = CommandTag.Any> {
+export interface Editor<
+  AvailableCommands extends CommandTag.Any = CommandTag.Any,
+  AvailableActions extends ActionTag.Any = ActionTag.Any,
+> {
   readonly _tag: "Editor"
-  readonly core: EditingCore.Core<Available>
+  readonly core: EditingCore.Core<AvailableCommands, AvailableActions>
   readonly view: EditorView
   readonly state: EditorState
   readonly schema: Schema
-  readonly commands: EditingCore.CommandSurface<Available>
+  readonly commands: EditingCore.CommandSurface<AvailableCommands>
+  readonly actions: EditingCore.ActionSurface<AvailableActions>
   readonly transact: Transact
   readonly unmount: () => void
   readonly destroy: () => Promise<void>
 }
 
-export type Any = Editor<CommandTag.Any>
+export type Any = Editor<CommandTag.Any, ActionTag.Any>
 
-export const mount = <Available extends CommandTag.Any>(
-  core: EditingCore.Core<Available>,
+export const mount = <
+  AvailableCommands extends CommandTag.Any,
+  AvailableActions extends ActionTag.Any,
+>(
+  core: EditingCore.Core<AvailableCommands, AvailableActions>,
   element: Element,
-): Editor<Available> => {
+): Editor<AvailableCommands, AvailableActions> => {
   let mounted = true
   let view: EditorView | undefined
 
@@ -69,7 +77,7 @@ export const mount = <Available extends CommandTag.Any>(
     return view
   }
 
-  const commands: EditingCore.CommandSurface<Available> = {
+  const commands: EditingCore.CommandSurface<AvailableCommands> = {
     run: (tag, ...args) => {
       assertMounted()
       return binding.commands.run(tag, ...args)
@@ -81,6 +89,13 @@ export const mount = <Available extends CommandTag.Any>(
     isActive: (tag, ...args) => {
       assertMounted()
       return binding.commands.isActive(tag, ...args)
+    },
+  }
+
+  const actions: EditingCore.ActionSurface<AvailableActions> = {
+    run: (tag, ...args) => {
+      assertMounted()
+      return core.actions.run(tag, ...args)
     },
   }
 
@@ -99,6 +114,7 @@ export const mount = <Available extends CommandTag.Any>(
       return core.schema
     },
     commands,
+    actions,
     transact: (callback) => {
       assertMounted()
       return binding.transact(callback)

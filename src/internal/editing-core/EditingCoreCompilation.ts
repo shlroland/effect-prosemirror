@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, Option, type Scope } from "effect"
 
+import type { ActionDefinition, ActionTag } from "../Action.js"
 import type { CommandDefinition, CommandTag } from "../Command.js"
 import * as EditorSchema from "../EditorSchema.js"
 import {
@@ -20,6 +21,7 @@ interface IndexedDefinition {
 
 export interface CompiledExtension {
   readonly registry: ReadonlyMap<CommandTag.Any, readonly CommandDefinition[]>
+  readonly actionRegistry: ReadonlyMap<ActionTag.Any, ActionDefinition>
   readonly keymap: Keymap.StaticKeymap
 }
 
@@ -55,9 +57,20 @@ const collectDefinitions = (extension: Extension.Any): readonly IndexedDefinitio
   })
 }
 
+const isActionContribution = (
+  contribution: Contribution,
+): contribution is Contribution<"action.definitions", readonly ActionDefinition[]> =>
+  contribution.type === "action.definitions"
+
+const collectActionDefinitions = (extension: Extension.Any): readonly ActionDefinition[] =>
+  extension.contributions.flatMap((contribution) =>
+    isActionContribution(contribution) ? contribution.payload : [],
+  )
+
 const collectRuntimeDiagnostics = (
   extension: Extension.Any,
   definitions: readonly IndexedDefinition[],
+  actionDefinitions: readonly ActionDefinition[],
   keymap: Keymap.StaticKeymap,
 ): readonly FinalValidationDiagnostic[] => {
   const diagnostics: FinalValidationDiagnostic[] = [...EditorSchema.collect(extension).diagnostics]
@@ -91,6 +104,25 @@ const collectRuntimeDiagnostics = (
     diagnostics.push({ _tag: "MissingCommandImplementation", command: tag.commandName })
   }
 
+  const actionTagsByName = new Map<string, ActionTag.Any>()
+  const actionTags = new Set<ActionTag.Any>()
+
+  for (const definition of actionDefinitions) {
+    const tag = definition.tag
+    if (actionTags.has(tag)) {
+      diagnostics.push({ _tag: "DuplicateActionDefinition", action: tag.actionName })
+      continue
+    }
+    actionTags.add(tag)
+
+    const existing = actionTagsByName.get(tag.actionName)
+    if (existing && existing !== tag) {
+      diagnostics.push({ _tag: "DuplicateActionName", action: tag.actionName })
+      continue
+    }
+    actionTagsByName.set(tag.actionName, tag)
+  }
+
   return diagnostics
 }
 
@@ -108,13 +140,23 @@ const buildRegistry = (
   return registry
 }
 
+const buildActionRegistry = (
+  definitions: readonly ActionDefinition[],
+): ReadonlyMap<ActionTag.Any, ActionDefinition> =>
+  new Map(definitions.map((definition) => [definition.tag, definition]))
+
 export const compile = (extension: Extension.Any): CompiledExtension => {
   const definitions = collectDefinitions(extension)
+  const actionDefinitions = collectActionDefinitions(extension)
   const keymap = Keymap.collect(extension)
-  const diagnostics = collectRuntimeDiagnostics(extension, definitions, keymap)
+  const diagnostics = collectRuntimeDiagnostics(extension, definitions, actionDefinitions, keymap)
   if (diagnostics.length > 0) throw new FinalValidationError({ diagnostics })
 
-  return { registry: buildRegistry(definitions), keymap }
+  return {
+    registry: buildRegistry(definitions),
+    actionRegistry: buildActionRegistry(actionDefinitions),
+    keymap,
+  }
 }
 
 const isServiceRequirementContribution = (
@@ -154,7 +196,7 @@ export const buildSynchronousServiceContext = (
   extension: Extension.Any,
   scope: Scope.CloseableScope,
   layer: Layer.Layer<any, unknown, never> | undefined,
-): void => {
+): Context.Context<any> => {
   let context: Context.Context<never> | undefined
 
   try {
@@ -170,4 +212,6 @@ export const buildSynchronousServiceContext = (
     context as unknown as Context.Context<any>,
   )
   if (services.length > 0) throw new MissingServiceError({ services })
+
+  return context as Context.Context<any>
 }

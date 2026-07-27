@@ -1,8 +1,9 @@
-import type { Context, Layer } from "effect"
+import type { Context, Effect, Layer } from "effect"
 import type { Schema } from "prosemirror-model"
 import type { EditorState, Transaction } from "prosemirror-state"
 import type { EditorView } from "prosemirror-view"
 
+import type { ActionDefinition, ActionTag, Definition as ActionDefinitionShape } from "../Action.js"
 import type { CommandDefinition, CommandTag } from "../Command.js"
 import type { EditingCoreError } from "../Error.js"
 import type { EditorSchemaError } from "../EditorSchema.js"
@@ -64,6 +65,26 @@ type CommandDefinitions<Spec> = Spec extends {
     ? CommandDefinitions<Extension.SpecOf<Extensions[number]>>
     : never
 
+type ActionDefinitions<Spec> = Spec extends {
+  readonly actionDefinitions: infer Definitions
+}
+  ? Definitions extends readonly ActionDefinition[]
+    ? Definitions[number]
+    : never
+  : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
+    ? ActionDefinitions<Extension.SpecOf<Extensions[number]>>
+    : never
+
+type ActionDefinitionTuples<Spec> = Spec extends {
+  readonly actionDefinitions: infer Definitions
+}
+  ? Definitions extends readonly ActionDefinition[]
+    ? Definitions
+    : never
+  : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
+    ? ActionDefinitionTuples<Extension.SpecOf<Extensions[number]>>
+    : never
+
 type KeyBindings<Spec> = Spec extends { readonly keyBindings: infer Bindings }
   ? Bindings extends readonly unknown[]
     ? Bindings[number]
@@ -74,7 +95,7 @@ type KeyBindings<Spec> = Spec extends { readonly keyBindings: infer Bindings }
 
 type IsAny<Value> = 0 extends 1 & Value ? true : false
 
-type ServiceRequirements<Spec> =
+type ExplicitServiceRequirements<Spec> =
   IsAny<Spec> extends true
     ? never
     : Spec extends { readonly serviceRequirement: infer Tag }
@@ -82,14 +103,28 @@ type ServiceRequirements<Spec> =
         ? Requirement
         : never
       : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
-        ? ServiceRequirements<Extension.SpecOf<Extensions[number]>>
+        ? ExplicitServiceRequirements<Extension.SpecOf<Extensions[number]>>
         : never
+
+type ActionRequirement<Definition> = Definition extends unknown
+  ? ActionDefinitionShape.Requirements<Definition>
+  : never
+
+type ActionRequirements<Spec> = ActionRequirement<ActionDefinitions<Spec>>
 
 type ImplementedCommandTags<Spec, Definition = CommandDefinitions<Spec>> = [Definition] extends [
   never,
 ]
   ? never
   : Definition extends CommandDefinition<infer Tag>
+    ? Tag
+    : never
+
+type ImplementedActionTags<Spec, Definition = ActionDefinitions<Spec>> = [Definition] extends [
+  never,
+]
+  ? never
+  : Definition extends ActionDefinition<infer Tag>
     ? Tag
     : never
 
@@ -142,10 +177,35 @@ type MissingCommandImplementationDiagnostics<
     : Diagnostic<"MissingCommandImplementation", { readonly command: CommandTag.Name<Tag> }>
   : never
 
+type ActionDefinitionDiagnostics<
+  Definitions,
+  SeenTags = never,
+  SeenNames = never,
+> = Definitions extends readonly [
+  infer First extends ActionDefinition,
+  ...infer Rest extends readonly ActionDefinition[],
+]
+  ? First["tag"] extends infer Tag extends ActionTag.Any
+    ? Tag extends SeenTags
+      ? Diagnostic<"DuplicateActionDefinition", { readonly action: ActionTag.Name<Tag> }>
+      : ActionTag.Name<Tag> extends SeenNames
+        ? Diagnostic<"DuplicateActionName", { readonly action: ActionTag.Name<Tag> }>
+        : ActionDefinitionDiagnostics<Rest, SeenTags | Tag, SeenNames | ActionTag.Name<Tag>>
+    : never
+  : never
+
+type DuplicateActionDiagnostics<Spec> =
+  ActionDefinitionTuples<Spec> extends infer Definitions
+    ? Definitions extends readonly ActionDefinition[]
+      ? ActionDefinitionDiagnostics<Definitions>
+      : never
+    : never
+
 type FinalValidationDiagnostics<ExtensionValue extends Extension.Any> =
   | MissingNodeTargetDiagnostics<Extension.SpecOf<ExtensionValue>>
   | MissingMarkTargetDiagnostics<Extension.SpecOf<ExtensionValue>>
   | MissingCommandImplementationDiagnostics<Extension.SpecOf<ExtensionValue>>
+  | DuplicateActionDiagnostics<Extension.SpecOf<ExtensionValue>>
 
 export type FinalValidation<ExtensionValue extends Extension.Any> = [
   FinalValidationDiagnostics<ExtensionValue>,
@@ -157,14 +217,29 @@ export type AvailableCommandTags<ExtensionValue extends Extension.Any> = Impleme
   Extension.SpecOf<ExtensionValue>
 >
 
-export type Requirements<ExtensionValue extends Extension.Any> = ServiceRequirements<
+export type AvailableActionTags<ExtensionValue extends Extension.Any> = ImplementedActionTags<
   Extension.SpecOf<ExtensionValue>
 >
+
+export type Requirements<ExtensionValue extends Extension.Any> =
+  | ExplicitServiceRequirements<Extension.SpecOf<ExtensionValue>>
+  | ActionRequirements<Extension.SpecOf<ExtensionValue>>
 
 export interface CommandSurface<Available extends CommandTag.Any> {
   readonly run: <Tag extends Available>(tag: Tag, ...args: CommandTag.Args<Tag>) => boolean
   readonly canRun: <Tag extends Available>(tag: Tag, ...args: CommandTag.Args<Tag>) => boolean
   readonly isActive: <Tag extends Available>(tag: Tag, ...args: CommandTag.Args<Tag>) => boolean
+}
+
+export interface ActionSurface<Available extends ActionTag.Any> {
+  readonly run: <Tag extends Available>(
+    tag: Tag,
+    ...args: ActionTag.Args<Tag>
+  ) => Effect.Effect<
+    ActionTag.Success<Tag>,
+    ActionTag.Failure<Tag> | import("../Action.js").RuntimeError,
+    never
+  >
 }
 
 export interface TransactionContext {
@@ -196,17 +271,21 @@ export interface ViewBinding<Available extends CommandTag.Any = CommandTag.Any> 
   readonly unmount: () => void
 }
 
-export interface Core<Available extends CommandTag.Any = CommandTag.Any> {
+export interface Core<
+  AvailableCommands extends CommandTag.Any = CommandTag.Any,
+  AvailableActions extends ActionTag.Any = ActionTag.Any,
+> {
   readonly _tag: "EditingCore"
   readonly state: EditorState
   readonly schema: Schema
-  readonly commands: CommandSurface<Available>
+  readonly commands: CommandSurface<AvailableCommands>
+  readonly actions: ActionSurface<AvailableActions>
   readonly keymap: Keymap.StaticKeymap
   readonly transact: Transact
   readonly destroy: () => Promise<void>
 }
 
-export type Any = Core<CommandTag.Any>
+export type Any = Core<CommandTag.Any, ActionTag.Any>
 
 export interface Options<ExtensionValue extends Extension.Any = Extension.Any> {
   readonly extension: ExtensionValue
@@ -218,7 +297,7 @@ export type ValidatedOptions<ExtensionValue extends Extension.Any> = Options<Ext
 
 type SynchronousServiceLayer<Requirement> = [Requirement] extends [never]
   ? { readonly layer?: undefined }
-  : { readonly layer: Layer.Layer<Requirement, unknown, never> }
+  : { readonly layer: Layer.Layer<any, unknown, never> }
 
 export type CreateOptions<ExtensionValue extends Extension.Any> = ValidatedOptions<ExtensionValue> &
   SynchronousServiceLayer<Requirements<ExtensionValue>>

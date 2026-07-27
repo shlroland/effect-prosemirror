@@ -10,7 +10,7 @@ Effect ProseMirror combines ProseMirror's editor model with Effect-managed runti
 - Do not make ProseMirror commands asynchronous.
 - Do not implement UI framework adapters in the first phase.
 - Do not embed arbitrary business Layers inside extensions in the first phase.
-- Do not design the full Action or Plugin APIs before the core extension model is stable.
+- Do not model Actions as asynchronous ProseMirror Commands.
 
 ## MVP API
 
@@ -320,7 +320,7 @@ For multiple definitions of the same Command Tag, state queries use `some` seman
 
 `Command.define(tag, { run })` is required instead of accepting arbitrary functions. This associates the implementation with its public contract, keeps synchronous return types explicit, and leaves room for future command metadata or state queries without changing the API shape. It supersedes the earlier named-record form.
 
-`run` should not receive Effect services or an editor-specific context. Command follows ProseMirror's existing synchronous command concept, so service-dependent or asynchronous workflows belong to the future Action API.
+`run` should not receive Effect services or an editor-specific context. Command follows ProseMirror's existing synchronous command concept, so service-dependent or asynchronous workflows belong to the Action API.
 
 ## Keymaps
 
@@ -395,7 +395,7 @@ Effect.provide(program, Layer.mergeAll(AiClientLive, EditingCore.layer({ extensi
 
 Effect-native construction validates each declared service against its supplied Context and fails with `MissingServiceError { services }` when one is absent. `EditingCore.create` and `createEditor` instead require a no-input `layer` that provides every declared service. That Layer is built into the Editor Scope, so its resources are released with `destroy()`. Synchronous construction cannot await Layer acquisition: a failing or asynchronous Layer produces `ServiceLayerCreationError { cause }`; applications needing asynchronous provisioning use `EditingCore.make` or `EditingCore.layer`.
 
-In the MVP, `Extension.Require(Tag)` is explicit because schema, command, and keymap contributions do not run Effect programs directly. Future `Extension.Actions` and `Extension.Plugin` APIs should automatically accumulate requirements from their Effect environment types, while `Extension.Require` remains available for explicit external contracts.
+In the MVP, `Extension.Require(Tag)` is explicit because schema, command, and keymap contributions do not run Effect programs directly. Action Definitions and future Effect-backed Plugin APIs automatically accumulate requirements from their Effect environment types, while `Extension.Require` remains available for explicit external contracts.
 
 ## Editor Creation
 
@@ -415,7 +415,7 @@ const program = Effect.gen(function* () {
 
 `EditingCore.make(options)` is the lower-level scoped constructor with `Effect.Effect<EditingCore, EditingCoreError, Requirements | Scope>`. `EditingCore.layer(options)` provides `Layer.Layer<EditingCore, EditingCoreError, Requirements>`. `EditingCore.create(options)` is the synchronous convenience constructor: it owns an internal Scope until `core.destroy()` and throws the same tagged errors that Effect-native construction places in its error channel. No separate `EditorService` contract is introduced.
 
-The service obtained through `yield* EditingCore.EditingCore` exposes the same synchronous ProseMirror-oriented surface as `EditingCore.create`: command operations and `transact` return direct booleans, while state and schema are direct getters. Effect manages construction, requirements, Scope, and future Actions; it does not duplicate these operations as `runEffect` or `transactEffect` and does not turn a synchronous ProseMirror Command into an Effect Command. Exceptional synchronous failures are still normalized to the agreed `Data.TaggedError` values.
+The service obtained through `yield* EditingCore.EditingCore` exposes the same synchronous ProseMirror-oriented surface as `EditingCore.create`: command operations and `transact` return direct booleans, while state and schema are direct getters. Effect manages construction, requirements, Scope, and Actions; it does not duplicate these operations as `runEffect` or `transactEffect` and does not turn a synchronous ProseMirror Command into an Effect Command. Exceptional synchronous failures are still normalized to the agreed `Data.TaggedError` values.
 
 `Editor.mount` binds an existing core to a DOM element and returns an Editor Instance. `createEditor` is the convenience constructor for application and framework code that creates and mounts a core in one call:
 
@@ -600,16 +600,17 @@ type Diagnostic<Message extends string, Detail> = {
 
 ## Async Boundary
 
-Asynchronous work is not modeled as commands. It belongs to Effectful Actions, which are deferred from the MVP API.
+Asynchronous editing intents are not modeled as Commands. An Action Definition produces a lazy Effect whose external requirements are inferred by its Extension Contribution and provided by the Editing Core. The Effect begins one Action Execution when it is run; merely constructing it does not capture editor state or start work.
 
-The intended model is:
+The Action model is:
 
-- a synchronous command or UI event starts an Effectful Action
-- the action uses Effect services and may track a Tracked Target
-- when ready, the action performs Reentry against the current editor state
-- Reentry submits a synchronous editing operation
+- UI, plugin, or application code runs an Action Effect
+- the Action may capture one opaque Tracked Selection and use Effect services
+- the target maps through every accepted transaction while the Effect is running
+- Reentry atomically resolves the target against the latest state and submits a synchronous editing operation
+- caller interruption or Editing Core Destroy interrupts the Action Execution, while Editor Unmount does not
 
-This preserves ProseMirror's synchronous state and transaction model.
+The first Action interface exposes only `Action.Tag`, `Action.define`, `Extension.Actions`, `actions.run`, `Action.trackSelection`, and `Action.reenter`. It does not expose a generic Target Protocol, Promise or Fiber convenience methods, progress state, or Command-style definition merging. Tracked Target Change is reported to the Action, while Tracked Target Loss prevents its Reentry. This preserves ProseMirror's synchronous state and transaction model while keeping Effect execution explicit.
 
 ## Testing Strategy
 

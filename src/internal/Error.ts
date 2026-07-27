@@ -22,11 +22,23 @@ export interface MissingCommandImplementationDiagnostic {
   readonly command: string
 }
 
+export interface DuplicateActionDefinitionDiagnostic {
+  readonly _tag: "DuplicateActionDefinition"
+  readonly action: string
+}
+
+export interface DuplicateActionNameDiagnostic {
+  readonly _tag: "DuplicateActionName"
+  readonly action: string
+}
+
 export type FinalValidationDiagnostic =
   | MissingNodeTargetDiagnostic
   | MissingMarkTargetDiagnostic
   | DuplicateCommandNameDiagnostic
   | MissingCommandImplementationDiagnostic
+  | DuplicateActionDefinitionDiagnostic
+  | DuplicateActionNameDiagnostic
 
 export class FinalValidationError extends Data.TaggedError("FinalValidationError")<{
   readonly diagnostics: readonly FinalValidationDiagnostic[]
@@ -66,6 +78,20 @@ export class CommandNotAvailableError extends Data.TaggedError("CommandNotAvaila
 export class CommandExecutionError extends Data.TaggedError("CommandExecutionError")<{
   readonly command: string
   readonly operation: "run" | "canRun" | "isActive"
+  readonly cause: unknown
+}> {}
+
+export class ActionNotAvailableError extends Data.TaggedError("ActionNotAvailableError")<{
+  readonly action: string
+}> {}
+
+export class TrackedSelectionEmptyError extends Data.TaggedError(
+  "TrackedSelectionEmptyError",
+)<{}> {}
+
+export class TrackedTargetLostError extends Data.TaggedError("TrackedTargetLostError")<{}> {}
+
+export class ActionReentryError extends Data.TaggedError("ActionReentryError")<{
   readonly cause: unknown
 }> {}
 
@@ -110,6 +136,10 @@ export type EditingCoreError =
   | InvalidKeyError
   | CommandNotAvailableError
   | CommandExecutionError
+  | ActionNotAvailableError
+  | TrackedSelectionEmptyError
+  | TrackedTargetLostError
+  | ActionReentryError
   | TransactionReentryError
   | TransactionExecutionError
   | EditorDestroyedError

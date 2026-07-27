@@ -8,6 +8,7 @@ import type {
 } from "prosemirror-model"
 
 import type { CommandDefinition } from "./Command.js"
+import type { ActionDefinition } from "./Action.js"
 import type { KeyBinding } from "./Keymap.js"
 import { Default, type Priority } from "./Priority.js"
 
@@ -88,6 +89,7 @@ export type AttrOptions<Type extends string = string, Attr extends string = stri
   | AttrOptionsWithValidation<Type, Attr>
 
 export type CommandDefinitions = readonly CommandDefinition[]
+export type ActionDefinitions = readonly ActionDefinition[]
 export type KeyBindings = readonly KeyBinding[]
 export type ServiceTag = Context.Tag<any, any>
 
@@ -218,6 +220,15 @@ export const Commands = <const Definitions extends CommandDefinitions>(
 }> =>
   make({ commandDefinitions: definitions }, [
     { type: "command.definitions", payload: definitions, priority: Default },
+  ])
+
+export const Actions = <const Definitions extends ActionDefinitions>(
+  ...definitions: Definitions
+): Extension<{
+  readonly actionDefinitions: Definitions
+}> =>
+  make({ actionDefinitions: definitions }, [
+    { type: "action.definitions", payload: definitions, priority: Default },
   ])
 
 export const Keymap = <const Bindings extends KeyBindings>(

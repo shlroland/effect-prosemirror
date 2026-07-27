@@ -1,4 +1,5 @@
 export * as Command from "./internal/Command.js"
+export * as Action from "./internal/Action.js"
 export * as CommandInvocation from "./internal/CommandInvocation.js"
 export * as EditingCore from "./internal/editing-core/EditingCore.js"
 export * as Editor from "./internal/Editor.js"

@@ -16,28 +16,36 @@ _Avoid_: Async command, effect command
 The Tag-driven API exposed by an Editing Core for synchronously running a Command or querying whether it can run or is active. Its accepted Tag union is inferred from that core's implemented Command Contributions, and each operation infers the selected Tag's complete argument tuple. It does not generate methods from public command names or accept arbitrary declared Tags.
 _Avoid_: String command registry, generated named command methods
 
-**Effectful Action**:
-An asynchronous or Effect-managed operation that can use services and later submit a synchronous editing operation back into the editor runtime.
-_Avoid_: Async command
-
 **Action**:
-A library-defined operation model for Effect-managed workflows that need services, asynchronous work, or custom runtime behavior outside ProseMirror's command contract.
-_Avoid_: Command
+A discrete, Editor Scope-managed editing intent that spans asynchronous time, may use Effect services, and can later Reenter the latest document state.
+_Avoid_: Effectful Action, Async Command, generic Effect
 
 **Action Surface**:
-The type-safe API exposed by composed Extensions for invoking Effectful Actions separately from synchronous commands.
+The Tag-driven interface that exposes the Actions available from a composed Extension as lazy Effects with typed arguments, success values, and failures.
 _Avoid_: Async command surface
 
+**Action Execution**:
+A running instance of an Action that begins when its lazy Effect is executed. It survives Editor Unmount and is interrupted by either its caller or destruction of the owning Editing Core.
+_Avoid_: Action value, background command, detached task
+
 **Reentry**:
-The process where an Effectful Action returns to the current editor runtime and submits a synchronous editing operation based on the current editor state.
-_Avoid_: Resume, commit, apply
+The atomic process where an Action resolves a Tracked Target against the latest Editing Core state and submits a synchronous editing operation.
+_Avoid_: Resume, commit, stale transaction
 
 **Tracked Target**:
-An editing target held by an Effectful Action that can be mapped through document changes before Reentry.
+An opaque editing target owned by an Action Execution and mapped through accepted document changes until Reentry or Action completion.
 _Avoid_: Saved position, stale selection
 
+**Tracked Target Change**:
+The state where a Tracked Target still resolves but its original content was touched while the Action was running. The Action decides whether that change is a conflict.
+_Avoid_: Target loss, automatic conflict
+
+**Tracked Target Loss**:
+The state where a Tracked Target can no longer identify the intended document content, so Reentry cannot edit it.
+_Avoid_: Target change, mapped deletion
+
 **Editor Scope**:
-The Effect lifecycle boundary owned by a single Editing Core and inherited by its mounted Editor Instance. Resources and background work inside the Editor Scope end when the core is destroyed.
+The Effect lifecycle boundary owned by a single Editing Core and inherited by its mounted Editor Instance. Resources and Action Executions inside the Editor Scope end when the core is destroyed, not when a View is unmounted.
 _Avoid_: App runtime, global editor runtime
 
 **Editor Instance**:
@@ -49,7 +57,7 @@ The DOM-independent object that remains the sole owner of the schema and current
 _Avoid_: Headless editor, Editor Instance, server-only editor
 
 **Synchronous Core Surface**:
-The invariant that an Editing Core exposes ProseMirror-oriented commands, state queries, and `transact` through their direct synchronous values even when the core is obtained from Effect Context. Effect manages construction, requirements, Scope, and future Actions; it does not wrap these operations in duplicate Effect-returning methods.
+The invariant that an Editing Core exposes ProseMirror-oriented commands, state queries, and `transact` through direct synchronous values, while Actions remain separate lazy Effects. Effect manages construction, requirements, and Scope without wrapping synchronous operations in duplicate Effect-returning methods.
 _Avoid_: runEffect, transactEffect, Effect Command
 
 **Editor Mount**:
