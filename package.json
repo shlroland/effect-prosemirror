@@ -30,6 +30,10 @@
       "types": "./dist/extensions/doc.d.ts",
       "default": "./dist/extensions/doc.js"
     },
+    "./extensions/history": {
+      "types": "./dist/extensions/history.d.ts",
+      "default": "./dist/extensions/history.js"
+    },
     "./extensions/paragraph": {
       "types": "./dist/extensions/paragraph.d.ts",
       "default": "./dist/extensions/paragraph.js"
@@ -56,6 +60,7 @@
   },
   "dependencies": {
     "effect": "^3.19.6",
+    "prosemirror-history": "^1.5.0",
     "prosemirror-keymap": "^1.2.3",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",

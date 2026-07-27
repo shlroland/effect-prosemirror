@@ -232,6 +232,10 @@ _Avoid_: Command contract, Command name
 One of the minimal synchronous editing intents provided by `BaseCommands.make()`: inserting text, deleting a non-empty selection, selecting the complete document, or splitting the current paragraph. Base Commands are schema-aware ProseMirror operations and do not carry key bindings, history, or asynchronous behavior.
 _Avoid_: Editor action, key binding, async command
 
+**History Extension**:
+The opt-in `History.make(options?)` extension that installs the native ProseMirror history State Plugin and contributes synchronous `History.Undo` and `History.Redo` Commands. It is composed explicitly rather than included in `Basic.make()`.
+_Avoid_: Default history, async undo, History Action
+
 **Paragraph Split**:
 The Base Command that splits the current paragraph only when the selection is an empty TextSelection and ProseMirror confirms the document can split at that position. A non-empty selection or unsplittable position returns `false`.
 _Avoid_: Split selected content, forced split, generic block split

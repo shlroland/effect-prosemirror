@@ -222,3 +222,22 @@ Validation:
 - runtime test for invalid keyed-plugin configuration
 - Action regression test whose Tracked Selection maps through an appended
   transaction
+
+## Phase 9: Opt-in History Extension
+
+Status: complete.
+
+Provide the first useful built-in consumer of State Plugin Contributions without
+changing the minimal `Basic.make()` contract.
+
+Deliverables:
+
+- `History.make(options?)` wrapping the native `prosemirror-history` Plugin
+- synchronous `History.Undo` and `History.Redo` Commands
+- public extension-path and root exports
+- an options interface for `depth` and `newGroupDelay`
+
+Validation:
+
+- runtime test for undo/redo through the Core Command Surface
+- type test for the opt-in History options and zero-argument Commands

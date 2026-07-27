@@ -67,10 +67,12 @@ import * as Doc from "effect-prosemirror/extensions/doc"
 import * as Text from "effect-prosemirror/extensions/text"
 import * as Paragraph from "effect-prosemirror/extensions/paragraph"
 import * as Basic from "effect-prosemirror/extensions/basic"
+import * as History from "effect-prosemirror/extensions/history"
 
 const extension = Extension.union(Doc.make(), Text.make(), Paragraph.make())
 
 const basic = Basic.make()
+const withHistory = Extension.union(Basic.make(), History.make())
 ```
 
 The first built-in extensions should be minimal and exist to validate the core model: `Doc.make()`, `Text.make()`, `Paragraph.make()`, and `Basic.make()`.
@@ -82,6 +84,12 @@ Basic.make() = Extension.union(Doc.make(), Text.make(), Paragraph.make())
 ```
 
 `BaseCommands.make()` is composed into `Basic.make()`. It contributes four schema-aware synchronous Commands: `InsertText(text)`, `DeleteSelection()`, `SelectAll()`, and `SplitParagraph()`. `SplitParagraph()` accepts only an empty TextSelection at a ProseMirror-splittable position; it does not delete or split a selected range. Neither slice includes history, keymaps, marks, lists, tables, drop cursor, or gap cursor.
+
+`History.make(options?)` is a separate opt-in extension. It contributes the
+native `prosemirror-history` Plugin and synchronous `History.Undo` /
+`History.Redo` Commands. History is excluded from `Basic.make()` so applications
+choose its memory and grouping policy explicitly; `options.depth` and
+`options.newGroupDelay` are forwarded to ProseMirror history.
 
 ## Extension Contributions
 
