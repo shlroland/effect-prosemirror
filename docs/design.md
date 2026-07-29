@@ -665,6 +665,13 @@ Type behavior is part of the public API and must be tested explicitly.
 
 Use Vitest for runtime tests and type-oriented tests. Use `expect-type` for positive type assertions and `@ts-expect-error` fixtures for negative type assertions.
 
+Mark and inline-command tests use the test-only `createTestCore` helper. It
+creates a DOM-independent Editing Core and accepts ProseKit-style `<a>` / `<b>`
+selection tags, for example `test.set("hello <a>world<b>")`. The helper only
+sets up a document and selection; assertions still cross the public Core
+Command Surface and inspect public Core state. It is deliberately not a runtime
+or package export, and it does not import ProseMirror's upstream test suite.
+
 Suggested layout:
 
 ```txt

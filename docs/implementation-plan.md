@@ -241,3 +241,23 @@ Validation:
 
 - runtime test for undo/redo through the Core Command Surface
 - type test for the opt-in History options and zero-argument Commands
+
+## Phase 10: Basic Inline Marks and Test Core
+
+Status: complete.
+
+Add the first inline formatting extensions and standardize their test setup on a
+small, Core-native fixture inspired by ProseKit's tagged document workflow.
+
+Deliverables:
+
+- opt-in `Strong.make()` with `Toggle` and `Mod-B`
+- opt-in `Emphasis.make()` with `Toggle` and `Mod-I`
+- a test-only `createTestCore` helper using `<a>` / `<b>` selection tags
+- root and extension-path exports for both mark extensions
+
+Validation:
+
+- runtime tests for mark toggling through the Core Command Surface
+- runtime tests for Static Keymap contributions
+- type tests for zero-argument Toggle Commands

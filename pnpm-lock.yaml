@@ -11,6 +11,9 @@ importers:
       effect:
         specifier: ^3.19.6
         version: 3.21.3
+      prosemirror-commands:
+        specifier: ^1.7.1
+        version: 1.7.1
       prosemirror-history:
         specifier: ^1.5.0
         version: 1.5.0
@@ -1832,6 +1835,9 @@ packages:
 
   property-information@7.2.0:
     resolution: {integrity: sha512-IAtzIB6sUiWaJYrX9smp3V46pBGbBeLFRGdh25kg1334VcBlD8HzhPeNIWQH9zhGmo2itIe25EHt9dQP7G5hmg==}
+
+  prosemirror-commands@1.7.1:
+    resolution: {integrity: sha512-rT7qZnQtx5c0/y/KlYaGvtG411S97UaL6gdp6RIZ23DLHanMYLyfGBV5DtSnZdthQql7W+lEVbpSfwtO8T+L2w==}
 
   prosemirror-history@1.5.0:
     resolution: {integrity: sha512-zlzTiH01eKA55UAf1MEjtssJeHnGxO0j4K4Dpx+gnmX9n+SHNlDqI2oO1Kv1iPN5B1dm5fsljCfqKF9nFL6HRg==}
@@ -4118,6 +4124,12 @@ snapshots:
   prismjs@1.30.0: {}
 
   property-information@7.2.0: {}
+
+  prosemirror-commands@1.7.1:
+    dependencies:
+      prosemirror-model: 1.25.8
+      prosemirror-state: 1.4.4
+      prosemirror-transform: 1.12.0
 
   prosemirror-history@1.5.0:
     dependencies:

@@ -236,6 +236,10 @@ _Avoid_: Editor action, key binding, async command
 The opt-in `History.make(options?)` extension that installs the native ProseMirror history State Plugin and contributes synchronous `History.Undo` and `History.Redo` Commands. It is composed explicitly rather than included in `Basic.make()`.
 _Avoid_: Default history, async undo, History Action
 
+**Test Core**:
+A test-only, DOM-independent Editing Core fixture that accepts ProseKit-style `<a>` / `<b>` selection tags. It prepares public Core state for extension tests without becoming a runtime API or replacing Core Command Surface assertions.
+_Avoid_: Public test editor, mocked command runtime, upstream test-suite fork
+
 **Paragraph Split**:
 The Base Command that splits the current paragraph only when the selection is an empty TextSelection and ProseMirror confirms the document can split at that position. A non-empty selection or unsplittable position returns `false`.
 _Avoid_: Split selected content, forced split, generic block split
