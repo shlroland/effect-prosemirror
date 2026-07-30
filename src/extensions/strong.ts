@@ -6,6 +6,7 @@ import * as Extension from "../internal/Extension.js"
 import * as Key from "../internal/Key.js"
 import * as KeyChord from "../internal/KeyChord.js"
 import * as Keymap from "../internal/Keymap.js"
+import * as MarkInputRule from "../internal/MarkInputRule.js"
 
 export class Toggle extends Command.Tag("toggleStrong")<Toggle, []>() {}
 
@@ -30,4 +31,10 @@ export const make = () =>
     }),
     Extension.Commands(toggle),
     Extension.Keymap(shortcut),
+    Extension.InputRules(
+      MarkInputRule.make({
+        match: /(?:^|\s)\*\*([^\s*]|[^\s*][^*]*[^\s*])\*\*$/,
+        mark: "strong",
+      }),
+    ),
   )

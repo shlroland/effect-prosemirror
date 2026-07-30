@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, type Scope } from "effect"
+import { inputRules as inputRulesPlugin, type InputRule } from "prosemirror-inputrules"
 import type { Plugin as ProseMirrorPlugin } from "prosemirror-state"
 
 import type { ActionDefinition, ActionTag } from "../Action.js"
@@ -22,6 +23,12 @@ interface IndexedDefinition {
 
 interface IndexedPlugin {
   readonly plugin: ProseMirrorPlugin
+  readonly priority: PriorityValue
+  readonly index: number
+}
+
+interface IndexedInputRule {
+  readonly rule: InputRule
   readonly priority: PriorityValue
   readonly index: number
 }
@@ -96,6 +103,32 @@ const collectPlugins = (extension: Extension.Any): readonly ProseMirrorPlugin[] 
       return priorityDifference === 0 ? left.index - right.index : priorityDifference
     })
     .map(({ plugin }) => plugin)
+}
+
+const isInputRulesContribution = (
+  contribution: Contribution,
+): contribution is Contribution<"input-rules", readonly InputRule[]> =>
+  contribution.type === "input-rules"
+
+const collectInputRules = (extension: Extension.Any): readonly InputRule[] => {
+  const rules: IndexedInputRule[] = []
+  let index = 0
+
+  for (const contribution of extension.contributions) {
+    if (!isInputRulesContribution(contribution)) continue
+
+    for (const rule of contribution.payload) {
+      rules.push({ rule, priority: contribution.priority, index })
+      index += 1
+    }
+  }
+
+  return rules
+    .sort((left, right) => {
+      const priorityDifference = priorityRank[right.priority] - priorityRank[left.priority]
+      return priorityDifference === 0 ? left.index - right.index : priorityDifference
+    })
+    .map(({ rule }) => rule)
 }
 
 const collectRuntimeDiagnostics = (
@@ -179,7 +212,11 @@ const buildActionRegistry = (
 export const compile = (extension: Extension.Any): CompiledExtension => {
   const definitions = collectDefinitions(extension)
   const actionDefinitions = collectActionDefinitions(extension)
-  const plugins = collectPlugins(extension)
+  const inputRules = collectInputRules(extension)
+  const plugins = [
+    ...collectPlugins(extension),
+    ...(inputRules.length > 0 ? [inputRulesPlugin({ rules: inputRules })] : []),
+  ]
   const keymap = Keymap.collect(extension)
   const diagnostics = collectRuntimeDiagnostics(extension, definitions, actionDefinitions, keymap)
   if (diagnostics.length > 0) throw new FinalValidationError({ diagnostics })

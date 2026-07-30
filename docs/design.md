@@ -672,6 +672,23 @@ sets up a document and selection; assertions still cross the public Core
 Command Surface and inspect public Core state. It is deliberately not a runtime
 or package export, and it does not import ProseMirror's upstream test suite.
 
+View-owned behavior such as Input Rules uses the companion test-only
+`createTestEditor` fixture. Its `inputText("**word**")` helper feeds individual
+characters through the mounted View's native `handleTextInput` plugin seam and
+falls back to the normal View insertion path. This preserves a concise
+ProseKit-style test call site while verifying the real ProseMirror Input Rules
+Plugin rather than reimplementing browser input events in jsdom.
+
+`Extension.InputRules(...rules)` is the Input Rules Contribution. It accepts
+native `prosemirror-inputrules` `InputRule` values, preserves their tuple type,
+and the Editing Core compiles all contributed rules into one native Input Rules
+Plugin. Rules run by descending Extension priority and then declaration order.
+`Strong.make()` contributes the `**text**` to `strong` rule and
+`Emphasis.make()` contributes the `*text*` to `em` rule; both remove their
+delimiters. The shared internal Mark Input Rule resolves its MarkType from the
+current Editor State at input time, so independently composed schemas stay
+compatible without introducing a wrapped public rule type.
+
 Suggested layout:
 
 ```txt

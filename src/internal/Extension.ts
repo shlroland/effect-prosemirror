@@ -6,6 +6,7 @@ import type {
   MarkSpec as ProseMirrorMarkSpec,
   NodeSpec as ProseMirrorNodeSpec,
 } from "prosemirror-model"
+import type { InputRule as ProseMirrorInputRule } from "prosemirror-inputrules"
 import type { Plugin as ProseMirrorPlugin } from "prosemirror-state"
 
 import type { CommandDefinition } from "./Command.js"
@@ -92,6 +93,7 @@ export type AttrOptions<Type extends string = string, Attr extends string = stri
 export type CommandDefinitions = readonly CommandDefinition[]
 export type ActionDefinitions = readonly ActionDefinition[]
 export type StatePlugin = ProseMirrorPlugin<any>
+export type InputRules = readonly ProseMirrorInputRule[]
 export type KeyBindings = readonly KeyBinding[]
 export type ServiceTag = Context.Tag<any, any>
 
@@ -238,6 +240,12 @@ export const Plugin = <const Value extends StatePlugin>(
 ): Extension<{
   readonly statePlugin: Value
 }> => make({ statePlugin: plugin }, [{ type: "state.plugin", payload: plugin, priority: Default }])
+
+export const InputRules = <const Rules extends InputRules>(
+  ...rules: Rules
+): Extension<{
+  readonly inputRules: Rules
+}> => make({ inputRules: rules }, [{ type: "input-rules", payload: rules, priority: Default }])
 
 export const Keymap = <const Bindings extends KeyBindings>(
   ...bindings: Bindings

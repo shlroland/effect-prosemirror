@@ -261,3 +261,24 @@ Validation:
 - runtime tests for mark toggling through the Core Command Surface
 - runtime tests for Static Keymap contributions
 - type tests for zero-argument Toggle Commands
+
+## Phase 11: Markdown Mark Input Rules
+
+Status: complete.
+
+Add View-owned Markdown input behavior while retaining normal native Plugin
+semantics and a compact ProseKit-style test call site.
+
+Deliverables:
+
+- a test-only `createTestEditor(...).inputText(...)` fixture
+- `Extension.InputRules(...rules)` with tuple preservation and priority merge
+- an internal Mark Input Rule adapter that resolves a Mark from current state
+- `**text**` to Strong and `*text*` to Emphasis rules
+- native `prosemirror-inputrules` dependency
+
+Validation:
+
+- jsdom runtime tests that type each delimiter pattern through the mounted View
+- runtime and type tests for merged Input Rules contributions
+- existing Command and Static Keymap tests remain green for both mark extensions

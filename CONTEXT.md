@@ -240,6 +240,18 @@ _Avoid_: Default history, async undo, History Action
 A test-only, DOM-independent Editing Core fixture that accepts ProseKit-style `<a>` / `<b>` selection tags. It prepares public Core state for extension tests without becoming a runtime API or replacing Core Command Surface assertions.
 _Avoid_: Public test editor, mocked command runtime, upstream test-suite fork
 
+**Test Editor**:
+A test-only mounted Editor fixture whose `inputText` method sends text through the View's native `handleTextInput` seam before falling back to normal insertion. It is used for View-owned behavior such as Input Rules.
+_Avoid_: Browser-event reimplementation, public test editor, direct Plugin mock
+
+**Mark Input Rule**:
+An internal native ProseMirror Input Rule that converts typed delimiters around text into a Mark while removing the delimiters. It resolves the named Mark from the current Editor State and is contributed by an extension as a normal State Plugin.
+_Avoid_: Async formatting, Core transaction hook, wrapped public rule type
+
+**Input Rules Contribution**:
+An `Extension.InputRules(...rules)` contribution of native ProseMirror Input Rules. The Editing Core merges all contributed rules into one native Input Rules Plugin ordered by Extension priority and declaration order.
+_Avoid_: Per-extension Input Rules Plugin, unmerged rule list, custom text parser
+
 **Paragraph Split**:
 The Base Command that splits the current paragraph only when the selection is an empty TextSelection and ProseMirror confirms the document can split at that position. A non-empty selection or unsplittable position returns `false`.
 _Avoid_: Split selected content, forced split, generic block split

@@ -1,9 +1,12 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it } from "vitest"
 
 import { Extension, Key, KeyChord } from "../../src/core.js"
 import * as Basic from "../../src/extensions/basic.js"
 import * as Strong from "../../src/extensions/strong.js"
 import { createTestCore } from "../support/TestCore.js"
+import { createTestEditor } from "../support/TestEditor.js"
 
 describe("Strong", () => {
   it("wraps the tagged selection in a strong mark", async () => {
@@ -44,5 +47,26 @@ describe("Strong", () => {
     ])
 
     await test.core.destroy()
+  })
+
+  it("turns Markdown delimiters typed through the Editor View into a strong mark", async () => {
+    const test = createTestEditor({
+      extension: Extension.union(Basic.make(), Strong.make()),
+    })
+    test.set("<a>")
+
+    test.inputText("**word**")
+
+    expect(test.editor.state.doc.toJSON()).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", marks: [{ type: "strong" }], text: "word" }],
+        },
+      ],
+    })
+
+    await test.editor.destroy()
   })
 })
