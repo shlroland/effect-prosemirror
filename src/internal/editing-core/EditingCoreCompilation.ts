@@ -13,6 +13,7 @@ import {
 } from "../Error.js"
 import type { Contribution, Extension, ServiceTag } from "../Extension.js"
 import * as Keymap from "../Keymap.js"
+import * as NodeView from "../NodeView.js"
 import { Priority, type Priority as PriorityValue } from "../Priority.js"
 
 interface IndexedDefinition {
@@ -38,6 +39,7 @@ export interface CompiledExtension {
   readonly actionRegistry: ReadonlyMap<ActionTag.Any, ActionDefinition>
   readonly plugins: readonly ProseMirrorPlugin[]
   readonly keymap: Keymap.StaticKeymap
+  readonly nodeViews: NodeView.Registry
 }
 
 const priorityRank: Record<PriorityValue, number> = {
@@ -136,8 +138,15 @@ const collectRuntimeDiagnostics = (
   definitions: readonly IndexedDefinition[],
   actionDefinitions: readonly ActionDefinition[],
   keymap: Keymap.StaticKeymap,
+  nodeViews: NodeView.Registry,
 ): readonly FinalValidationDiagnostic[] => {
-  const diagnostics: FinalValidationDiagnostic[] = [...EditorSchema.collect(extension).diagnostics]
+  const schema = EditorSchema.collect(extension)
+  const diagnostics: FinalValidationDiagnostic[] = [...schema.diagnostics]
+  for (const node of nodeViews.adapters.keys()) {
+    if (!schema.nodes[node]) {
+      diagnostics.push({ _tag: "MissingNodeViewTarget", node })
+    }
+  }
   const commandTagsByName = new Map<string, CommandTag.Any>()
   const duplicateNames = new Set<string>()
   const implementedTags = new Set(definitions.map(({ definition }) => definition.tag))
@@ -218,7 +227,14 @@ export const compile = (extension: Extension.Any): CompiledExtension => {
     ...(inputRules.length > 0 ? [inputRulesPlugin({ rules: inputRules })] : []),
   ]
   const keymap = Keymap.collect(extension)
-  const diagnostics = collectRuntimeDiagnostics(extension, definitions, actionDefinitions, keymap)
+  const nodeViews = NodeView.collect(extension)
+  const diagnostics = collectRuntimeDiagnostics(
+    extension,
+    definitions,
+    actionDefinitions,
+    keymap,
+    nodeViews,
+  )
   if (diagnostics.length > 0) throw new FinalValidationError({ diagnostics })
 
   return {
@@ -226,6 +242,7 @@ export const compile = (extension: Extension.Any): CompiledExtension => {
     actionRegistry: buildActionRegistry(actionDefinitions),
     plugins,
     keymap,
+    nodeViews,
   }
 }
 

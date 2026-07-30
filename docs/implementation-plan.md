@@ -282,3 +282,29 @@ Validation:
 - jsdom runtime tests that type each delimiter pattern through the mounted View
 - runtime and type tests for merged Input Rules contributions
 - existing Command and Static Keymap tests remain green for both mark extensions
+
+## Phase 12: Native NodeView Adapters
+
+Status: complete.
+
+Add a framework-neutral, View-owned NodeView contribution without moving DOM
+ownership into Editing Core or introducing a second plugin protocol.
+
+Deliverables:
+
+- `Extension.NodeView({ node, create })` for native ProseMirror NodeView factories
+- a `NodeView` Context exposing ProseMirror's node, view, `getPos`, decorations,
+  and inner decorations
+- one adapter per node name, resolved by priority and declaration order
+- typed and runtime Final Validation for missing target nodes
+- registry installation through `Editor.mount`'s `EditorView` direct `nodeViews`
+  prop
+
+Validation:
+
+- runtime test for custom DOM creation at the mounted Editor seam
+- runtime tests for Core-driven `update`, declined-update replacement, and
+  NodeView-originated transactions returning through the Core
+- runtime tests for destruction, remount recreation, priority selection, and
+  mount-failure recovery
+- type test for NodeView target Final Validation

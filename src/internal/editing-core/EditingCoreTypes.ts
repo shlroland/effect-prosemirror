@@ -13,10 +13,12 @@ import type {
   NamedMarkSpec,
   NamedNodeSpec,
   NodeAttrSpec,
+  NodeView as NodeViewAdapter,
   UnionSpec,
 } from "../Extension.js"
 import type { InitialContent } from "../InitialContent.js"
 import type * as Keymap from "../Keymap.js"
+import type * as NodeView from "../NodeView.js"
 
 export interface Diagnostic<Message extends string, Detail> {
   readonly __effectProsemirrorError: Message
@@ -53,6 +55,14 @@ type MarkAttrs<Spec> = Spec extends { readonly markAttr: infer Attr }
     : never
   : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
     ? MarkAttrs<Extension.SpecOf<Extensions[number]>>
+    : never
+
+type NodeViews<Spec> = Spec extends { readonly nodeView: infer Adapter }
+  ? Adapter extends NodeViewAdapter
+    ? Adapter
+    : never
+  : Spec extends UnionSpec<infer Extensions extends readonly Extension.Any[]>
+    ? NodeViews<Extension.SpecOf<Extensions[number]>>
     : never
 
 type CommandDefinitions<Spec> = Spec extends {
@@ -168,6 +178,15 @@ type MissingMarkTargetDiagnostics<Spec> =
       : never
     : never
 
+type MissingNodeViewTargetDiagnostics<Spec> =
+  NodeViews<Spec> extends infer Adapter
+    ? Adapter extends NodeViewAdapter
+      ? Adapter["node"] extends NodeSpecNames<Spec>
+        ? never
+        : Diagnostic<"MissingNodeViewTarget", { readonly node: Adapter["node"] }>
+      : never
+    : never
+
 type MissingCommandImplementationDiagnostics<
   Spec,
   Tag = InvokedCommandTags<Spec>,
@@ -204,6 +223,7 @@ type DuplicateActionDiagnostics<Spec> =
 type FinalValidationDiagnostics<ExtensionValue extends Extension.Any> =
   | MissingNodeTargetDiagnostics<Extension.SpecOf<ExtensionValue>>
   | MissingMarkTargetDiagnostics<Extension.SpecOf<ExtensionValue>>
+  | MissingNodeViewTargetDiagnostics<Extension.SpecOf<ExtensionValue>>
   | MissingCommandImplementationDiagnostics<Extension.SpecOf<ExtensionValue>>
   | DuplicateActionDiagnostics<Extension.SpecOf<ExtensionValue>>
 
@@ -264,6 +284,7 @@ export interface ViewBinding<Available extends CommandTag.Any = CommandTag.Any> 
   readonly state: EditorState
   readonly schema: Schema
   readonly commands: CommandSurface<Available>
+  readonly nodeViews: NodeView.Registry
   readonly transact: (
     callback: (context: MountedTransactionContext) => Transaction | false,
   ) => boolean

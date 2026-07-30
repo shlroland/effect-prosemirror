@@ -12,6 +12,7 @@ import {
   type EditorError,
 } from "./Error.js"
 import * as KeymapPlugin from "./KeymapPlugin.js"
+import * as NodeView from "./NodeView.js"
 
 export interface TransactionContext extends EditingCore.MountedTransactionContext {}
 
@@ -60,6 +61,7 @@ export const mount = <
     view = new EditorView(element, {
       state: binding.state,
       plugins: [KeymapPlugin.create(core.keymap, binding.commands)],
+      nodeViews: NodeView.constructors(binding.nodeViews),
       dispatchTransaction: binding.dispatchTransaction,
     })
   } catch (cause) {

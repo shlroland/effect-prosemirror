@@ -124,6 +124,14 @@ _Avoid_: Duplicate NodeJSON validation pipeline, InitialContent schema adapter
 An `Extension.Plugin(plugin)` contribution that installs one normal ProseMirror State Plugin in the Editing Core. Its state field, transaction filter, and append behavior run through the Core-owned EditorState; its Plugin View is owned by a mounted EditorView.
 _Avoid_: Plugin wrapper, Core plugin surface, View-only plugin
 
+**NodeView Adapter**:
+A View-owned `Extension.NodeView({ node, create })` contribution that maps one declared schema node to a native ProseMirror NodeView factory. Editing Core validates the target and retains the static adapter registry without creating DOM; Editor Mount supplies it through `EditorView` direct props. ProseMirror owns each adapter instance's create, update, replacement, and destroy lifecycle, including unmount and remount.
+_Avoid_: State Plugin, Core-owned DOM, NodeView Effect scope, command fallback chain
+
+**NodeView Adapter Merge**:
+The Contribution Merge that chooses one adapter per node name: higher priority overrides lower priority, and a later declaration overrides an earlier declaration at the same priority. There is no fallback chain because ProseMirror accepts one NodeView factory per node name.
+_Avoid_: Duplicate-node rejection, chained NodeViews, plugin ordering
+
 **Effect-backed Plugin**:
 A future normal ProseMirror plugin whose side effects, background work, and external dependencies are managed by Effect services inside the Editor Scope. It is distinct from the initial State Plugin Contribution because it needs a scoped asynchronous lifecycle.
 _Avoid_: Effect plugin, async plugin

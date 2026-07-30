@@ -22,6 +22,7 @@ import {
   TrackedTargetLostError,
 } from "../Error.js"
 import type * as Keymap from "../Keymap.js"
+import type * as NodeView from "../NodeView.js"
 import type {
   Any,
   ActionSurface,
@@ -70,6 +71,7 @@ class CoreImpl<
     private readonly editorSchema: Schema,
     private editorState: EditorState,
     readonly keymap: Keymap.StaticKeymap,
+    private readonly nodeViews: NodeView.Registry,
   ) {
     this.commands = {
       run: (tag, ...args) => this.run(tag, args),
@@ -469,6 +471,7 @@ class CoreImpl<
         canRun: (tag, ...args) => this.canRun(tag, args, view()),
         isActive: (tag, ...args) => this.isActive(tag, args),
       },
+      nodeViews: this.nodeViews,
       transact: (callback) => this.transactWithView(callback, view()),
       dispatchTransaction: (transaction) => {
         if (this.destroyed) return
@@ -503,4 +506,6 @@ export const make = (
   schema: Schema,
   state: EditorState,
   keymap: Keymap.StaticKeymap,
-): Any => new CoreImpl(scope, registry, actionRegistry, actionContext, schema, state, keymap)
+  nodeViews: NodeView.Registry,
+): Any =>
+  new CoreImpl(scope, registry, actionRegistry, actionContext, schema, state, keymap, nodeViews)

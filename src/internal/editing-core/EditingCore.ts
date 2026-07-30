@@ -66,6 +66,7 @@ const buildCore = (
     schema,
     state,
     compiled.keymap,
+    compiled.nodeViews,
   )
 }
 

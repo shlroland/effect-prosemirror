@@ -12,6 +12,11 @@ export interface MissingMarkTargetDiagnostic {
   readonly attr: string
 }
 
+export interface MissingNodeViewTargetDiagnostic {
+  readonly _tag: "MissingNodeViewTarget"
+  readonly node: string
+}
+
 export interface DuplicateCommandNameDiagnostic {
   readonly _tag: "DuplicateCommandName"
   readonly command: string
@@ -35,6 +40,7 @@ export interface DuplicateActionNameDiagnostic {
 export type FinalValidationDiagnostic =
   | MissingNodeTargetDiagnostic
   | MissingMarkTargetDiagnostic
+  | MissingNodeViewTargetDiagnostic
   | DuplicateCommandNameDiagnostic
   | MissingCommandImplementationDiagnostic
   | DuplicateActionDefinitionDiagnostic

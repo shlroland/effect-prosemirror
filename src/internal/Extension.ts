@@ -12,6 +12,7 @@ import type { Plugin as ProseMirrorPlugin } from "prosemirror-state"
 import type { CommandDefinition } from "./Command.js"
 import type { ActionDefinition } from "./Action.js"
 import type { KeyBinding } from "./Keymap.js"
+import type { Adapter as NodeViewAdapter } from "./NodeView.js"
 import { Default, type Priority } from "./Priority.js"
 
 export interface Contribution<Type extends string = string, Payload = unknown> {
@@ -95,6 +96,7 @@ export type ActionDefinitions = readonly ActionDefinition[]
 export type StatePlugin = ProseMirrorPlugin<any>
 export type InputRules = readonly ProseMirrorInputRule[]
 export type KeyBindings = readonly KeyBinding[]
+export type NodeView = NodeViewAdapter
 export type ServiceTag = Context.Tag<any, any>
 
 class ExtensionImpl<Spec> implements Extension<Spec> {
@@ -255,6 +257,12 @@ export const Keymap = <const Bindings extends KeyBindings>(
   make({ keyBindings: bindings }, [
     { type: "keymap.bindings", payload: bindings, priority: Default },
   ])
+
+export const NodeView = <const Adapter extends NodeViewAdapter>(
+  adapter: Adapter,
+): Extension<{
+  readonly nodeView: Adapter
+}> => make({ nodeView: adapter }, [{ type: "view.nodeView", payload: adapter, priority: Default }])
 
 export const Require = <const Tag extends ServiceTag>(
   tag: Tag,
