@@ -52,6 +52,10 @@ _Avoid_: App runtime, global editor runtime
 The handle returned after an Editor Mount, exposing the ProseMirror view, typed command surface, action surface, and two explicit lifecycle operations: idempotent View-only `unmount()` and irreversible core-owning `destroy()`.
 _Avoid_: Runtime, editor config
 
+**React Adapter**:
+A client-side integration package that accepts a caller-owned Editing Core and mounts its Editor View through React. It exposes React components and hooks around the existing Core and Editor Instance without constructing the Core, owning its Effect Scope, duplicating document state, or executing Actions on the caller's behalf.
+_Avoid_: Controlled document state, React-owned Core, implicit service Layer, React Effect runtime
+
 **Editing Core**:
 The DOM-independent object that remains the sole owner of the schema and current ProseMirror `EditorState` before and after an Editor Instance is mounted. Every command and transaction path returns to the core; a mounted `EditorView` reflects the resulting state.
 _Avoid_: Headless editor, Editor Instance, server-only editor
@@ -59,6 +63,10 @@ _Avoid_: Headless editor, Editor Instance, server-only editor
 **Synchronous Core Surface**:
 The invariant that an Editing Core exposes ProseMirror-oriented commands, state queries, and `transact` through direct synchronous values, while Actions remain separate lazy Effects. Effect manages construction, requirements, and Scope without wrapping synchronous operations in duplicate Effect-returning methods.
 _Avoid_: runEffect, transactEffect, Effect Command
+
+**Core Subscription**:
+A synchronous listener registration on an Editing Core that notifies after each accepted state change, including selection-only, View-originated, and appended transactions. It observes Core-owned state without owning, transforming, or dispatching it, and provides the shared change signal for framework adapters.
+_Avoid_: React state store, transaction interceptor, polling
 
 **Editor Mount**:
 The operation that binds an Editing Core to one DOM element and creates the sole active `EditorView` owned by an Editor Instance. A core cannot have multiple active mounts.
@@ -131,6 +139,10 @@ _Avoid_: State Plugin, Core-owned DOM, NodeView Effect scope, command fallback c
 **NodeView Adapter Merge**:
 The Contribution Merge that chooses one adapter per node name: higher priority overrides lower priority, and a later declaration overrides an earlier declaration at the same priority. There is no fallback chain because ProseMirror accepts one NodeView factory per node name.
 _Avoid_: Duplicate-node rejection, chained NodeViews, plugin ordering
+
+**React NodeView Renderer**:
+A React Adapter renderer that creates one React root for each native NodeView instance. React owns only that instance's dedicated `reactDOM`; ProseMirror owns the outer NodeView DOM and, when present, a sibling `contentDOM`. NodeView destruction synchronously unmounts the corresponding React root.
+_Avoid_: Shared portal root, React-owned contentDOM, deferred NodeView cleanup
 
 **Effect-backed Plugin**:
 A future normal ProseMirror plugin whose side effects, background work, and external dependencies are managed by Effect services inside the Editor Scope. It is distinct from the initial State Plugin Contribution because it needs a scoped asynchronous lifecycle.
