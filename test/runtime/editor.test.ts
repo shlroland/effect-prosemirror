@@ -189,12 +189,17 @@ describe("Editor.mount", () => {
 
   it("creates a View synchronized with the Core and routes View dispatch through it", async () => {
     const { core, editor } = mounted()
+    const observed: string[] = []
+    core.subscribe(() => {
+      observed.push(core.state.doc.textContent)
+    })
 
     expect(editor.view.state).toBe(core.state)
     editor.view.dispatch(editor.view.state.tr.insertText("from view"))
 
     expect(core.state.doc.textContent).toBe("from view")
     expect(editor.view.state).toBe(core.state)
+    expect(observed).toEqual(["from view"])
 
     await core.destroy()
   })
@@ -313,6 +318,10 @@ describe("Editor.mount", () => {
 
   it("unmounts a View that cannot synchronize an accepted Core state", async () => {
     const { core, editor, element } = mounted()
+    const observed: string[] = []
+    core.subscribe(() => {
+      observed.push(core.state.doc.textContent)
+    })
     const cause = new Error("update failed")
     vi.spyOn(editor.view, "updateState").mockImplementation(() => {
       throw cause
@@ -327,6 +336,7 @@ describe("Editor.mount", () => {
     }
 
     expect(core.state.doc.textContent).toBe("accepted")
+    expect(observed).toEqual(["accepted"])
     expect(element.childElementCount).toBe(0)
     expect(() => editor.view).toThrow(EditorUnmountedError)
 

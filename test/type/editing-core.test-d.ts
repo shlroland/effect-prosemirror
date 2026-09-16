@@ -27,6 +27,9 @@ core.commands.run(SetHeading, 1)
 core.commands.canRun(SetHeading, 2)
 core.commands.isActive(SetHeading, 3)
 
+expectTypeOf(core.subscribe).parameter(0).toEqualTypeOf<() => void>()
+expectTypeOf(core.subscribe(() => undefined)).toEqualTypeOf<() => void>()
+
 // @ts-expect-error The current Editing Core does not implement this Tag.
 core.commands.run(InsertTable)
 

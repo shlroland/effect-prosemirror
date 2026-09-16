@@ -62,6 +62,7 @@ class CoreImpl<
   private destroyPromise: Promise<void> | undefined
   private viewBinding: ViewBindingOptions | undefined
   private readonly trackedSelections = new Set<Action.TrackedSelection>()
+  private readonly subscribers = new Set<() => void>()
 
   constructor(
     private readonly scope: Scope.CloseableScope,
@@ -100,10 +101,19 @@ class CoreImpl<
 
   readonly transact: Transact = (callback) => this.transactWithView(callback)
 
+  subscribe(listener: () => void): () => void {
+    this.assertLive()
+    this.subscribers.add(listener)
+    return () => {
+      this.subscribers.delete(listener)
+    }
+  }
+
   destroy(): Promise<void> {
     if (this.destroyPromise) return this.destroyPromise
 
     this.destroyed = true
+    this.subscribers.clear()
     let viewDestructionError: { readonly cause: unknown } | undefined
     try {
       this.releaseView(this.viewBinding, true)
@@ -174,6 +184,7 @@ class CoreImpl<
       } catch (cause) {
         if (
           cause instanceof TransactionExecutionError ||
+          cause instanceof TransactionReentryError ||
           cause instanceof EditorViewSynchronizationError
         ) {
           throw cause
@@ -396,6 +407,7 @@ class CoreImpl<
     this.editorState = result.state
     this.mapTrackedSelections(result.transactions)
 
+    let synchronizationError: EditorViewSynchronizationError | undefined
     const binding = this.viewBinding
     if (binding) {
       try {
@@ -406,11 +418,18 @@ class CoreImpl<
         } catch {
           // Synchronization is already unrecoverable; retain its root cause.
         }
-        throw new EditorViewSynchronizationError({ cause })
+        synchronizationError = new EditorViewSynchronizationError({ cause })
       }
     }
 
+    this.notifySubscribers()
+    if (synchronizationError) throw synchronizationError
     return true
+  }
+
+  private notifySubscribers(): void {
+    const listeners = Array.from(this.subscribers)
+    for (const listener of listeners) listener()
   }
 
   private mapTrackedSelections(transactions: readonly Transaction[]): void {
@@ -481,7 +500,12 @@ class CoreImpl<
         try {
           this.applyTransaction(transaction)
         } catch (cause) {
-          if (cause instanceof EditorViewSynchronizationError) throw cause
+          if (
+            cause instanceof TransactionReentryError ||
+            cause instanceof EditorViewSynchronizationError
+          ) {
+            throw cause
+          }
           throw new TransactionExecutionError({ phase: "apply", cause })
         } finally {
           this.writing = false

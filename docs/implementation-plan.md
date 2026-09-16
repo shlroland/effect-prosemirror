@@ -308,3 +308,28 @@ Validation:
 - runtime tests for destruction, remount recreation, priority selection, and
   mount-failure recovery
 - type test for NodeView target Final Validation
+
+## Phase 13: Core Subscription
+
+Status: complete.
+
+Add a synchronous listener registration on Editing Core so framework adapters
+can observe accepted state changes without owning, transforming, or dispatching
+Core state.
+
+Deliverables:
+
+- `core.subscribe(listener)` returning an unsubscribe function
+- notification after every accepted state change, including selection-only,
+  View-originated, and appended transactions
+- no notification for rejected transactions, including `filterTransaction`
+- notification after an accepted state even when View synchronization fails
+- `EditorDestroyedError` for subscription after destroy
+- `TransactionReentryError` when a listener dispatches during notification
+
+Validation:
+
+- runtime tests for accepted, rejected, selection-only, unsubscribe, append,
+  destroy, and nested-dispatch behavior
+- jsdom tests for View-originated dispatch and failed View synchronization
+- type test for the subscribe and unsubscribe function signatures

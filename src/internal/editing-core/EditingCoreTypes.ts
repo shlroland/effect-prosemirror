@@ -303,6 +303,7 @@ export interface Core<
   readonly actions: ActionSurface<AvailableActions>
   readonly keymap: Keymap.StaticKeymap
   readonly transact: Transact
+  readonly subscribe: (listener: () => void) => () => void
   readonly destroy: () => Promise<void>
 }
 

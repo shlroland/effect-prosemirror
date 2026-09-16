@@ -1,4 +1,5 @@
 import { Context, Effect, Layer } from "effect"
+import { Plugin, TextSelection } from "prosemirror-state"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -397,5 +398,139 @@ describe("EditingCore", () => {
         command: "duplicate",
       })
     }
+  })
+
+  it("notifies a Core Subscription after an accepted state change", async () => {
+    const core = EditingCore.create({ extension: schemaExtension })
+    const observed: string[] = []
+
+    core.subscribe(() => {
+      observed.push(core.state.doc.textContent)
+    })
+
+    expect(core.transact(({ tr }) => tr.insertText("hello"))).toBe(true)
+    expect(observed).toEqual(["hello"])
+
+    await core.destroy()
+  })
+
+  it("does not notify a Core Subscription when a transaction is rejected", async () => {
+    const core = EditingCore.create({ extension: schemaExtension })
+    const calls: number[] = []
+
+    core.subscribe(() => {
+      calls.push(1)
+    })
+
+    expect(core.transact(() => false)).toBe(false)
+    expect(calls).toEqual([])
+
+    await core.destroy()
+  })
+
+  it("does not notify a Core Subscription when a State Plugin rejects the transaction", async () => {
+    const core = EditingCore.create({
+      extension: Extension.union(
+        schemaExtension,
+        Extension.Plugin(
+          new Plugin({
+            filterTransaction: (transaction) => !transaction.docChanged,
+          }),
+        ),
+      ),
+    })
+    const calls: number[] = []
+
+    core.subscribe(() => {
+      calls.push(1)
+    })
+
+    expect(core.transact(({ tr }) => tr.insertText("blocked"))).toBe(false)
+    expect(calls).toEqual([])
+
+    await core.destroy()
+  })
+
+  it("stops notifying after a Core Subscription is removed", async () => {
+    const core = EditingCore.create({ extension: schemaExtension })
+    const observed: string[] = []
+    const unsubscribe = core.subscribe(() => {
+      observed.push(core.state.doc.textContent)
+    })
+
+    expect(core.transact(({ tr }) => tr.insertText("one"))).toBe(true)
+    unsubscribe()
+    expect(core.transact(({ tr }) => tr.insertText("two"))).toBe(true)
+    expect(observed).toEqual(["one"])
+
+    await core.destroy()
+  })
+
+  it("notifies a Core Subscription after a selection-only change", async () => {
+    const core = EditingCore.create({ extension: schemaExtension })
+    expect(core.transact(({ tr }) => tr.insertText("hello"))).toBe(true)
+
+    const observed: number[] = []
+    core.subscribe(() => {
+      observed.push(core.state.selection.from)
+    })
+
+    expect(
+      core.transact(({ state, tr }) => tr.setSelection(TextSelection.create(state.doc, 1))),
+    ).toBe(true)
+    expect(observed).toEqual([1])
+    expect(core.state.doc.textContent).toBe("hello")
+
+    await core.destroy()
+  })
+
+  it("notifies a Core Subscription with state that includes appended transactions", async () => {
+    const appended = "test/subscription-appended"
+    const core = EditingCore.create({
+      extension: Extension.union(
+        schemaExtension,
+        Extension.Plugin(
+          new Plugin({
+            appendTransaction: (transactions, _, state) =>
+              transactions.some(
+                (transaction) => transaction.docChanged && transaction.getMeta(appended) !== true,
+              )
+                ? state.tr.insertText("!", state.selection.to).setMeta(appended, true)
+                : undefined,
+          }),
+        ),
+      ),
+    })
+    const observed: string[] = []
+
+    core.subscribe(() => {
+      observed.push(core.state.doc.textContent)
+    })
+
+    expect(core.transact(({ tr }) => tr.insertText("hello"))).toBe(true)
+    expect(observed).toEqual(["hello!"])
+
+    await core.destroy()
+  })
+
+  it("rejects Core Subscription registration after destroy", async () => {
+    const core = EditingCore.create({ extension: schemaExtension })
+    const done = core.destroy()
+
+    expect(() => core.subscribe(() => undefined)).toThrow(EditorDestroyedError)
+
+    await done
+  })
+
+  it("throws when a Core Subscription dispatches during notification", async () => {
+    const core = EditingCore.create({ extension: schemaExtension })
+    core.subscribe(() => {
+      core.transact(({ tr }) => tr.insertText("nested"))
+    })
+
+    expect(() => core.transact(({ tr }) => tr.insertText("hello"))).toThrow(TransactionReentryError)
+    expect(core.state.doc.textContent).toBe("hello")
+
+    await core.destroy()
   })
 })
