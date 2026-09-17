@@ -333,3 +333,22 @@ Validation:
   destroy, and nested-dispatch behavior
 - jsdom tests for View-originated dispatch and failed View synchronization
 - type test for the subscribe and unsubscribe function signatures
+
+## Phase 14: React adapter mount
+
+Status: complete.
+
+Publish `@effect-prosemirror/react` as a workspace package that mounts a
+caller-owned Editing Core through React without taking Core or Scope ownership.
+
+Deliverables:
+
+- `EditorProvider` receiving an existing Core
+- `EditorContent` as the sole Editor View mount path
+- `useEditor()` returning the mounted Editor Instance or `undefined`
+- React unmount destroying only the View
+
+Validation:
+
+- jsdom tests for Basic editing, View-only unmount, remount, and Strict Mode
+- type test for the public React entry point

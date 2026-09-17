@@ -52,7 +52,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p packages/react/tsconfig.build.json",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck",
     "demo:build": "astro build",
     "demo:dev": "astro dev",
@@ -60,10 +60,10 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "hooks:install": "mise exec -- pre-commit install --install-hooks",
-    "lint": "oxlint --deny-warnings src test vitest.config.ts",
-    "lint:fix": "oxlint --fix src test vitest.config.ts",
+    "lint": "oxlint --deny-warnings src test vitest.config.ts packages/react",
+    "lint:fix": "oxlint --fix src test vitest.config.ts packages/react",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/react/tsconfig.json --noEmit",
     "verify": "pnpm check && pnpm test && pnpm build"
   },
   "dependencies": {

@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a private TypeScript package for an Effect-managed ProseMirror runtime. Public source lives in `src/`, with the core API re-exported from `src/core.ts`, internal implementation under `src/internal/`, and the package entry point at `src/index.ts`. Runtime tests are in `test/runtime/**/*.test.ts`; compile-time type tests are in `test/type/**/*.test-d.ts`. Design context belongs in `CONTEXT.md`, `docs/design.md`, `docs/implementation-plan.md`, and ADRs under `docs/adr/`. Generated build output goes to `dist/` and should not be edited by hand.
+This is a private TypeScript workspace for an Effect-managed ProseMirror runtime. Core source lives in `src/`, with the core API re-exported from `src/core.ts`, internal implementation under `src/internal/`, and the package entry point at `src/index.ts`. The CSR React adapter lives in `packages/react/` as `@effect-prosemirror/react`. Runtime tests are in `test/runtime/**/*.test.ts` and `packages/react/test/runtime/**/*.test.tsx`; compile-time type tests are in `test/type/**/*.test-d.ts` and `packages/react/test/type/**/*.test-d.ts`. Design context belongs in `CONTEXT.md`, `docs/design.md`, `docs/implementation-plan.md`, and ADRs under `docs/adr/`. Generated build output goes to `dist/` and should not be edited by hand. Wordgard is a parallel track in a separate repository; do not add Wordgard code here.
 
 ## Build, Test, and Development Commands
 
