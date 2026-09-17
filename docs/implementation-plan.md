@@ -352,3 +352,24 @@ Validation:
 
 - jsdom tests for Basic editing, View-only unmount, remount, and Strict Mode
 - type test for the public React entry point
+
+## Phase 15: React Core state observation
+
+Status: complete.
+
+Expose Core-owned state to React through Core Subscription without duplicating
+document ownership. `useEditorState(selector)` works independently of the View
+lifecycle. Commands, Actions, and transactions remain on the existing Core and
+Editor surfaces.
+
+Deliverables:
+
+- `useEditorState(selector)` subscribed through `core.subscribe`
+- rerender on accepted document and selection-only changes
+- rerender on View-originated transactions
+- subscription teardown on React unmount
+
+Validation:
+
+- jsdom tests for Core transact, selection-only, View dispatch, and unmount
+- type test for selector inference

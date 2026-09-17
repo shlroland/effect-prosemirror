@@ -4,7 +4,7 @@ CSR React adapter for Effect ProseMirror. It mounts a caller-owned Editing Core 
 
 ```tsx
 import { Basic, EditingCore } from "effect-prosemirror"
-import { EditorContent, EditorProvider, useEditor } from "@effect-prosemirror/react"
+import { EditorContent, EditorProvider, useEditor, useEditorState } from "@effect-prosemirror/react"
 
 const core = EditingCore.create({ extension: Basic.make() })
 
@@ -16,3 +16,5 @@ function App() {
   )
 }
 ```
+
+`useEditorState(selector)` observes Core-owned state through Core Subscription and does not require a mounted View.

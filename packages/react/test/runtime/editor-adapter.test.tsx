@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
+import { TextSelection } from "prosemirror-state"
 import { StrictMode, useState } from "react"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { BaseCommands, Basic, EditingCore, EditorDestroyedError } from "effect-prosemirror"
 
-import { EditorContent, EditorProvider, useEditor } from "../../src/index.js"
+import { EditorContent, EditorProvider, useEditor, useEditorState } from "../../src/index.js"
 
 const Probe = () => {
   const editor = useEditor()
@@ -135,6 +136,141 @@ describe("React adapter", () => {
     screen.getByRole("button", { name: "close" }).click()
 
     expect(core.commands.run(BaseCommands.InsertText, "still live")).toBe(true)
+
+    await core.destroy()
+  })
+
+  it("rerenders when an accepted Core transaction changes document text", async () => {
+    const core = EditingCore.create({ extension: Basic.make() })
+    const TextView = () => {
+      const text = useEditorState((state) => state.doc.textContent)
+      return <span data-testid="text">{text}</span>
+    }
+
+    render(
+      <EditorProvider core={core}>
+        <TextView />
+      </EditorProvider>,
+    )
+
+    expect(screen.getByTestId("text").textContent).toBe("")
+    act(() => {
+      expect(core.transact(({ tr }) => tr.insertText("hello"))).toBe(true)
+    })
+    expect(screen.getByTestId("text").textContent).toBe("hello")
+
+    await core.destroy()
+  })
+
+  it("rerenders when an accepted transaction changes only the selection", async () => {
+    const core = EditingCore.create({ extension: Basic.make() })
+    act(() => {
+      expect(core.transact(({ tr }) => tr.insertText("hello"))).toBe(true)
+    })
+
+    const SelectionView = () => {
+      const from = useEditorState((state) => state.selection.from)
+      return <span data-testid="from">{from}</span>
+    }
+
+    render(
+      <EditorProvider core={core}>
+        <SelectionView />
+      </EditorProvider>,
+    )
+
+    expect(screen.getByTestId("from").textContent).toBe("6")
+    act(() => {
+      expect(
+        core.transact(({ state, tr }) => tr.setSelection(TextSelection.create(state.doc, 1))),
+      ).toBe(true)
+    })
+    expect(screen.getByTestId("from").textContent).toBe("1")
+
+    await core.destroy()
+  })
+
+  it("rerenders when a View-originated transaction is accepted", async () => {
+    const core = EditingCore.create({ extension: Basic.make() })
+    const TextView = () => {
+      const text = useEditorState((state) => state.doc.textContent)
+      return <span data-testid="text">{text}</span>
+    }
+    const DispatchButton = () => {
+      const editor = useEditor()
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            editor?.view.dispatch(editor.view.state.tr.insertText("from view"))
+          }}
+        >
+          dispatch
+        </button>
+      )
+    }
+
+    render(
+      <EditorProvider core={core}>
+        <EditorContent />
+        <TextView />
+        <DispatchButton />
+      </EditorProvider>,
+    )
+
+    expect(screen.getByTestId("text").textContent).toBe("")
+    act(() => {
+      screen.getByRole("button", { name: "dispatch" }).click()
+    })
+    expect(screen.getByTestId("text").textContent).toBe("from view")
+
+    await core.destroy()
+  })
+
+  it("stops rerendering after the React tree unmounts", async () => {
+    const core = EditingCore.create({ extension: Basic.make() })
+    const renders: string[] = []
+    const TextView = () => {
+      const text = useEditorState((state) => state.doc.textContent)
+      renders.push(text)
+      return <span data-testid="text">{text}</span>
+    }
+
+    const { unmount } = render(
+      <EditorProvider core={core}>
+        <TextView />
+      </EditorProvider>,
+    )
+
+    unmount()
+    const before = renders.length
+    act(() => {
+      expect(core.transact(({ tr }) => tr.insertText("ignored"))).toBe(true)
+    })
+    expect(renders.length).toBe(before)
+
+    await core.destroy()
+  })
+
+  it("keeps typed command access on the mounted Editor handle", async () => {
+    const core = EditingCore.create({ extension: Basic.make() })
+    const TextView = () => {
+      const text = useEditorState((state) => state.doc.textContent)
+      return <span data-testid="text">{text}</span>
+    }
+
+    render(
+      <EditorProvider core={core}>
+        <EditorContent />
+        <TextView />
+        <InsertButton />
+      </EditorProvider>,
+    )
+
+    act(() => {
+      screen.getByRole("button", { name: "insert" }).click()
+    })
+    expect(screen.getByTestId("text").textContent).toBe("hello")
 
     await core.destroy()
   })
