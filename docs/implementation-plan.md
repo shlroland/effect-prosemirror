@@ -373,3 +373,24 @@ Validation:
 
 - jsdom tests for Core transact, selection-only, View dispatch, and unmount
 - type test for selector inference
+
+## Phase 16: React atomic NodeView
+
+Status: complete.
+
+A third-party extension can render an atomic node with React while ProseMirror
+owns the outer NodeView DOM. Each native NodeView instance creates one React
+root on a dedicated `reactDOM` element, rerenders that root on `update`, and
+synchronously unmounts it in `destroy`.
+
+Deliverables:
+
+- `ReactNodeView.atom({ node, component })` returning a native NodeView Adapter
+- attribute updates rerender the existing root
+- React events dispatch through the Core-owned View transaction path
+- React root unmount runs exactly once per NodeView destroy
+
+Validation:
+
+- jsdom tests for render, attribute update, Core-bound click, and destroy/remount
+- type test for adapter node-name inference and Final Validation
