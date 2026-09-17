@@ -394,3 +394,25 @@ Validation:
 
 - jsdom tests for render, attribute update, Core-bound click, and destroy/remount
 - type test for adapter node-name inference and Final Validation
+
+## Phase 17: React content-bearing NodeView
+
+Status: complete.
+
+A third-party extension can render a node with nested content while React owns
+only `reactDOM` and ProseMirror owns a sibling `contentDOM`. Nested editing and
+selection stay on Core-owned state. Replacement and destroy unmount the React
+root without leaving the chrome DOM behind.
+
+Deliverables:
+
+- `ReactNodeView.content({ node, component })` returning a native NodeView Adapter
+- sibling `contentDOM` outside React reconciliation
+- `ignoreMutation` limited to the React host so contentDOM stays editable
+- destroy and replacement unmount the React root once
+
+Validation:
+
+- jsdom tests for nested content rendering, Core-synced editing/selection, and
+  replacement teardown
+- type test for content adapter node-name inference

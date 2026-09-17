@@ -34,4 +34,13 @@ Extension.NodeView(
     component: Widget,
   }),
 )
+
+Extension.NodeView(
+  ReactNodeView.content({
+    node: "callout",
+    component: Callout,
+  }),
+)
 ```
+
+`ReactNodeView.content` keeps ProseMirror-managed `contentDOM` as a sibling outside React reconciliation.

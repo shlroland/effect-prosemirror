@@ -8,9 +8,15 @@ const adapter = ReactNodeView.atom({
   node: "paragraph",
   component: (_props: NodeView.Context) => null,
 })
+const content = ReactNodeView.content({
+  node: "paragraph",
+  component: (_props: NodeView.Context) => null,
+})
 
 expectTypeOf(adapter.node).toEqualTypeOf<"paragraph">()
 expectTypeOf(adapter).toMatchTypeOf<NodeView.Adapter<"paragraph">>()
+expectTypeOf(content.node).toEqualTypeOf<"paragraph">()
+expectTypeOf(content).toMatchTypeOf<NodeView.Adapter<"paragraph">>()
 
 EditingCore.create({
   extension: Extension.union(Basic.make(), Extension.NodeView(adapter)),
